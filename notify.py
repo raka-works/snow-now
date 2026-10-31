@@ -7,19 +7,23 @@ import requests
 
 URL = "https://raka-works.github.io/snow-now/"
 WEEK = "月火水木金土日"
+# 全国だと冬の北海道で毎日鳴るので、通知は東京から行く地域に絞る（ページは全国）
+NOTIFY_REGIONS = ("関東甲信越", "北陸", "東北")
+PER_DAY = 6
 
 
 def main():
     hook = os.environ.get("DISCORD_WEBHOOK")
     s = json.load(open("data/summary.json", encoding="utf-8"))
-    names = {r["id"]: r["name"] for r in json.load(open("resorts.json", encoding="utf-8"))}
+    resorts = {r["id"]: r for r in json.load(open("resorts.json", encoding="utf-8"))}
+    names = {k: r["name"] for k, r in resorts.items()}
     sent = json.load(open("data/notified.json", encoding="utf-8")) if os.path.exists("data/notified.json") else {}
     today = dt.date.fromisoformat(s["made"][:10])
     sent = {k: v for k, v in sent.items() if dt.date.fromisoformat(k.split("|")[1]) >= today}
     by_day = {}
     for row in s["rows"]:
         for c in row["cells"]:
-            if not c or c["lv"] != "powder":
+            if not c or c["lv"] != "powder" or resorts[row["id"]]["region"] not in NOTIFY_REGIONS:
                 continue
             d = dt.date.fromisoformat(c["date"])
             # 3日先までは確定扱い。4〜7日先は土日だけ「予告」として送る
@@ -36,7 +40,7 @@ def main():
             head = f'{d.month}/{d.day}({WEEK[d.weekday()]})の朝・{kind}'
             by_day.setdefault((c["date"], head), []).append((c["new"], f'{names[row["id"]]} {c["new"]}cm'))
     if by_day:
-        lines = [f"{h}：" + "、".join(x for _, x in sorted(v, reverse=True)) for (_, h), v in sorted(by_day.items())]
+        lines = [f"{h}：" + "、".join(x for _, x in sorted(v, reverse=True)[:PER_DAY]) for (_, h), v in sorted(by_day.items())]
         msg = "❄ パウダーの見込み（新雪）\n" + "\n".join(lines) + f"\n{URL}"
         if hook:
             requests.post(hook, json={"content": msg}, timeout=30).raise_for_status()

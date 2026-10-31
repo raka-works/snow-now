@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>snow-now 中国・四国・九州のゲレンデの雪</title>
+<style>
+:root{color-scheme:light;--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;
+ --bar:#2a78d6;--bar-far:#86b6ef;--powder:#1c5cab;--powder-bg:#cde2fb;--bad:#d03b3b;--bad-bg:#fbe3e3;--we:#f0efec;--ring:rgba(11,11,11,.10)}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;
+ --bar:#3987e5;--bar-far:#256abf;--powder:#9ec5f4;--powder-bg:#184f95;--bad:#e66767;--bad-bg:#4a2020;--we:#232322;--ring:rgba(255,255,255,.10)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI","Hiragino Sans",sans-serif}
+header,section{max-width:1100px;margin:0 auto;padding:16px}
+header h1{font-size:20px;margin:0}
+header p{margin:4px 0 0;color:var(--ink2);font-size:13px}
+h2{font-size:17px;margin:0 0 4px}
+.lead{color:var(--ink2);font-size:13px;margin:0 0 12px}
+.card{background:var(--surface);border-radius:12px;box-shadow:0 0 0 1px var(--ring);padding:14px}
+.sub{display:block;color:var(--muted);font-size:12px;font-weight:400}
+.picks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.picks li{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:baseline}
+.picks li .sub{grid-column:2}
+.picks .none{display:block;color:var(--ink2)}
+.lv{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.lv.lv-powder{background:var(--powder-bg);color:var(--powder)}
+.lv.lv-ok{background:var(--we);color:var(--ink2)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink2);margin:0 0 10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums}
+th,td{padding:0}
+thead th{font-size:11px;font-weight:400;color:var(--muted);text-align:center;padding:4px 0;border-bottom:1px solid var(--axis);min-width:34px}
+thead th.we,td.we{background:var(--we)}
+th.name{position:sticky;left:0;z-index:1;background:var(--surface);text-align:left;font-size:14px;padding:6px 8px 6px 0;min-width:112px;max-width:130px;border-bottom:1px solid var(--grid);white-space:nowrap}
+tr.area th.name,tr.area td{font-size:11px;font-weight:700;color:var(--muted);padding:10px 0 2px;border-bottom:1px solid var(--axis)}
+th.name a{color:var(--ink);text-decoration:none;font-weight:700}
+th.name .sub{font-size:11px;line-height:1.35}
+td{border-bottom:1px solid var(--grid);text-align:center;vertical-align:bottom}
+td.c{cursor:default;padding:4px 0 2px;outline:none}
+td.c:hover,td.c:focus{background:var(--powder-bg)}
+td .v{display:block;font-size:11px;color:var(--ink2);height:15px}
+td .bar{display:flex;align-items:flex-end;justify-content:center;height:30px}
+td .bar i{display:block;width:12px;background:var(--bar);border-radius:4px 4px 0 0}
+td.far .bar i{background:var(--bar-far)}
+td .ic{display:block;font-size:12px;height:16px;line-height:16px;color:var(--muted)}
+td.lv-ok .ic{color:var(--axis);font-size:10px}
+td.lv-powder .ic{color:var(--powder);font-weight:700}
+td.lv-powder .v{color:var(--powder);font-weight:700}
+td.lv-bad .ic{color:var(--bad)}
+td.lv-closed .bar i{opacity:.55}
+#tip{position:fixed;z-index:9;max-width:260px;background:var(--ink);color:var(--surface);font-size:12px;padding:8px 10px;border-radius:8px;pointer-events:none;display:none}
+.plan td{padding:6px 8px;vertical-align:top;text-align:right;min-width:72px}
+.plan td b{font-size:15px}
+.plan td .sub{font-size:11px}
+.plan thead th{min-width:72px;text-align:right;padding-right:8px}
+.oms{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:12px}
+.om h3{font-size:14px;margin:0 0 4px}
+.om ul{margin:0;padding-left:18px;font-size:13px;color:var(--ink2)}
+.note{font-size:12px;color:var(--muted)}
+nav.regions{max-width:1100px;margin:0 auto;padding:0 16px 8px;display:flex;flex-wrap:wrap;gap:6px}
+nav.regions a{font-size:13px;padding:4px 10px;border:1px solid var(--axis);border-radius:999px;color:inherit;text-decoration:none}
+nav.regions a[aria-current]{background:var(--ink);color:var(--page)}
+.picks a{color:inherit;text-decoration:none;display:block}
+footer{max-width:1100px;margin:0 auto;padding:8px 16px 32px;font-size:11px;color:var(--muted)}
+footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+<h1>snow-now　中国・四国・九州のゲレンデの雪</h1>
+<p>11/1 08:35 更新（1日3回）</p>
+</header>
+<nav class="regions"><a href="../index.html">全国</a><a href="../r/hokkaido.html">北海道</a><a href="../r/tohoku.html">東北</a><a href="../r/kanto.html">関東甲信越</a><a href="../r/hokuriku.html">北陸</a><a href="../r/chukyo.html">中京</a><a href="../r/kansai.html">関西</a><a href="../r/west.html" aria-current="page">中国・四国・九州</a></nav>
+
+<section>
+<div class="card">
+<h2>今週末のおすすめ（中国・四国・九州）</h2>
+<p class="lead">土日の朝の新雪が多い順</p>
+<ul class="picks"><li class="none">今週末は新雪の見込みがあるゲレンデがありません</li></ul>
+</div>
+</section>
+
+<section>
+<h2>2週間の新雪（ゲレンデ上部）</h2>
+<p class="lead">数字はその日の朝まで（前日15時〜9時）に積もる新雪の cm。4〜7日目は薄い色（確かめた範囲だが外れやすい）。8日目以降は51通りの予報の中央値で、確かめていない目安。マスを押すと詳しい値が出ます。</p>
+<div class="legend"><span><b style="color:var(--powder)">❄</b> パウダー</span><span>○ 滑れる</span><span><b style="color:var(--bad)">△</b> 雨・強風</span><span>－ 営業前</span><span><i style="background:var(--bar)"></i>3日先まで</span><span><i style="background:var(--bar-far)"></i>4日目以降</span></div>
+<div class="card scroll">
+<table class="grid"><thead><tr><th class="name"></th><th class="we">11/1<br>日</th><th class="">11/2<br>月</th><th class="">11/3<br>火</th><th class="">11/4<br>水</th><th class="">11/5<br>木</th><th class="">11/6<br>金</th><th class="we">11/7<br>土</th><th class="we">11/8<br>日</th><th class="">11/9<br>月</th><th class="">11/10<br>火</th><th class="">11/11<br>水</th><th class="">11/12<br>木</th><th class="">11/13<br>金</th><th class="we">11/14<br>土</th></tr></thead><tbody></tbody></table>
+</div>
+<p class="note">去年までの2冬・全国2か所のアメダスで確かめた当たり具合（1冬目で係数を決めて2冬目で測り、その逆も平均）：20cm以上降った日を拾えた割合は1日前 60%・3日前 56%・7日前 32%、パウダーと出た日のうち外れた割合は1日前 25%・7日前 35%。8日目以降は確かめていない目安です。</p>
+</section>
+
+<section>
+<h2>1か月先の計画用</h2>
+<p class="lead">過去10シーズンで、その日までに上部に降った雪の合計（11/1から）。太字は真ん中の年、「少」は少ない年（下から2割）、「積雪」はふもとのアメダスの積雪の深さ（真ん中の年）。積もっている深さではなく降った量の合計で、気象庁の過去データとアメダスの実測で補正した目安です。週ごと・ゲレンデどうしの比較に使ってください。</p>
+<div class="card scroll">
+<table class="plan"><thead><tr><th class="name"></th><th>〜11/8</th><th>〜11/15</th><th>〜11/22</th><th>〜11/29</th><th>〜12/6</th><th>〜12/13</th></tr></thead><tbody></tbody></table>
+</div>
+<div class="oms"></div>
+</section>
+
+
+<footer>
+予報：<a href="https://open-meteo.com/">Open-Meteo</a>（気象庁MSM・GSM、ECMWF、GFS。CC BY 4.0）を、アメダスの実測に合わせて補正して計算。観測・1か月予報・過去データ：気象庁。過去の累計降雪：最寄りのアメダスの降水量・気温を上部の標高に直し、同じ観測点の降雪量の実測で補正して計算。個人用のページで、予報の正確さは保証しません。お出かけ前に公式発表を確認してください。
+</footer>
+
+<div id="tip" role="tooltip"></div>
+<script>
+const tip=document.getElementById('tip');
+function show(el){const r=el.getBoundingClientRect();tip.textContent=el.dataset.tip;tip.style.display='block';
+ const w=tip.offsetWidth;tip.style.left=Math.max(8,Math.min(innerWidth-w-8,r.left+r.width/2-w/2))+'px';
+ tip.style.top=(r.top>90?r.top-tip.offsetHeight-6:r.bottom+6)+'px';}
+document.querySelectorAll('[data-tip]').forEach(el=>{
+ el.addEventListener('mouseenter',()=>show(el));el.addEventListener('focus',()=>show(el));
+ el.addEventListener('click',()=>show(el));
+ el.addEventListener('mouseleave',()=>tip.style.display='none');el.addEventListener('blur',()=>tip.style.display='none');});
+addEventListener('scroll',()=>tip.style.display='none',true);
+</script>
+</body>
+</html>

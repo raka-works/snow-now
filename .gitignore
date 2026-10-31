@@ -4,3 +4,9 @@ data/verify/*.json
 __pycache__/
 設計.md
 tools/verify.log
+data/ens_daily.json
+data/verify2/
+tools/cache/
+tools/*.log
+tools/*.err
+__pycache__/

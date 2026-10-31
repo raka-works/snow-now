@@ -15,12 +15,19 @@ concurrency: update
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - run: pip install requests
+      - name: アンサンブルのまとめ（1日1回取り直す）を前の実行から引き継ぐ
+        uses: actions/cache@v4
+        with:
+          path: data/ens_daily.json
+          key: ens-${{ github.run_id }}
+          restore-keys: ens-
       - name: 予報と観測を取得
         run: python fetch.py
       - name: ページを作る
@@ -33,6 +40,6 @@ jobs:
         run: |
           git config user.name "raka-works"
           git config user.email "raka-works@users.noreply.github.com"
-          git add index.html data/summary.json data/notified.json data/onemonth.json
+          git add index.html r data/summary.json data/notified.json data/onemonth.json
           git diff --cached --quiet || git commit -m "update $(date -u +%FT%H:%MZ)"
           git push

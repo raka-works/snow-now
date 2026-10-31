@@ -10,10 +10,15 @@ STATIONS = {  # アメダス番号: (府県番号, etrnの番号)
     "54676": (54, "0537"), "54616": (54, "0534"), "54661": (54, "0536"),
 }
 MONTHS = [11, 12, 1, 2, 3, 4]
-URL = "https://www.data.jma.go.jp/obd/stats/etrn/view/daily_a1.php?prec_no={p}&block_no={b}&year={y}&month={m}&day=&view="
+URL = "https://www.data.jma.go.jp/obd/stats/etrn/view/daily_{k}1.php?prec_no={p}&block_no={b}&year={y}&month={m}&day=&view="
+# 列の位置（a1＝アメダス、s1＝気象台）
+COLS = {"a": dict(n=18, prec=1, tavg=4, tmax=5, tmin=6, gust=12, snowfall=16, depth=17),
+        "s": dict(n=21, prec=3, tavg=6, tmax=7, tmin=8, gust=14, snowfall=17, depth=18)}
 
 
 def num(s):
+    if s.strip() == "--":  # 気象台の表で「現象なし」
+        return 0.0
     s = re.sub(r"[)\]\s×#]", "", s)
     try:
         return float(s)
@@ -21,18 +26,19 @@ def num(s):
         return ""
 
 
-def month_rows(p, b, y, m):
-    r = requests.get(URL.format(p=p, b=b, y=y, m=m), timeout=30)
+def month_rows(p, b, y, m, k="a"):
+    r = requests.get(URL.format(p=p, b=b, y=y, m=m, k=k), timeout=30)
     r.encoding = "utf-8"
-    t = r.text[r.text.find('id="tablefix1"'):]
+    t = r.text[max(r.text.find('id="tablefix1"'), r.text.find("id='tablefix1'")):]
     t = t[: t.find("</table>")]
     out = []
     for row in re.findall(r"<tr.*?</tr>", t, re.S):
         c = [html.unescape(re.sub("<.*?>", "", x)).strip() for x in re.findall(r"<t[hd].*?</t[hd]>", row, re.S)]
-        if len(c) == 18 and c[0].isdigit():
-            out.append({"date": f"{y}-{m:02d}-{int(c[0]):02d}", "prec": num(c[1]), "tavg": num(c[4]),
-                        "tmax": num(c[5]), "tmin": num(c[6]), "wind_gust": num(c[12]),
-                        "snowfall": num(c[16]), "snow_depth": num(c[17])})
+        q = COLS[k]
+        if len(c) == q["n"] and c[0].isdigit():
+            out.append({"date": f"{y}-{m:02d}-{int(c[0]):02d}", "prec": num(c[q["prec"]]), "tavg": num(c[q["tavg"]]),
+                        "tmax": num(c[q["tmax"]]), "tmin": num(c[q["tmin"]]), "wind_gust": num(c[q["gust"]]),
+                        "snowfall": num(c[q["snowfall"]]), "snow_depth": num(c[q["depth"]])})
     return out
 
 
@@ -44,7 +50,7 @@ def main(first=2016, last=2025):
             for m in MONTHS:
                 y = season if m >= 11 else season + 1
                 rows += month_rows(p, b, y, m)
-                time.sleep(0.6)
+                pass
         with open(path, "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(rows[0]))
             w.writeheader()

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>snow-now 長野・新潟の雪</title>
+<title>snow-now {{title}}のゲレンデの雪</title>
 <style>
 :root{color-scheme:light;--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;
  --bar:#2a78d6;--bar-far:#86b6ef;--powder:#1c5cab;--powder-bg:#cde2fb;--bad:#d03b3b;--bad-bg:#fbe3e3;--we:#f0efec;--ring:rgba(11,11,11,.10)}
@@ -59,28 +59,33 @@ td.lv-closed .bar i{opacity:.55}
 .om h3{font-size:14px;margin:0 0 4px}
 .om ul{margin:0;padding-left:18px;font-size:13px;color:var(--ink2)}
 .note{font-size:12px;color:var(--muted)}
+nav.regions{max-width:1100px;margin:0 auto;padding:0 16px 8px;display:flex;flex-wrap:wrap;gap:6px}
+nav.regions a{font-size:13px;padding:4px 10px;border:1px solid var(--axis);border-radius:999px;color:inherit;text-decoration:none}
+nav.regions a[aria-current]{background:var(--ink);color:var(--page)}
+.picks a{color:inherit;text-decoration:none;display:block}
 footer{max-width:1100px;margin:0 auto;padding:8px 16px 32px;font-size:11px;color:var(--muted)}
 footer a{color:var(--muted)}
 </style>
 </head>
 <body>
 <header>
-<h1>snow-now　長野・新潟の雪</h1>
+<h1>snow-now　{{title}}のゲレンデの雪</h1>
 <p>{{updated}} 更新（1日3回）</p>
 </header>
+{{nav}}
 
 <section>
 <div class="card">
-<h2>今週末のおすすめ</h2>
+<h2>{{wtitle}}</h2>
 <p class="lead">土日の朝の新雪が多い順</p>
 <ul class="picks">{{weekend}}</ul>
 </div>
 </section>
-
+<!--grid-->
 <section>
 <h2>2週間の新雪（ゲレンデ上部）</h2>
-<p class="lead">数字はその日の朝まで（前日15時〜9時）に積もる新雪の cm。4日目以降は薄い色で、51通りの予報の中央値（目安）。マスを押すと詳しい値が出ます。</p>
-<div class="legend"><span><b style="color:var(--powder)">❄</b> パウダー</span><span>○ 滑れる</span><span><b style="color:var(--bad)">△</b> 雨・強風</span><span>－ 営業前</span><span><i style="background:var(--bar)"></i>3日先まで</span><span><i style="background:var(--bar-far)"></i>4日目以降（目安）</span></div>
+<p class="lead">数字はその日の朝まで（前日15時〜9時）に積もる新雪の cm。4〜7日目は薄い色（確かめた範囲だが外れやすい）。8日目以降は51通りの予報の中央値で、確かめていない目安。マスを押すと詳しい値が出ます。</p>
+<div class="legend"><span><b style="color:var(--powder)">❄</b> パウダー</span><span>○ 滑れる</span><span><b style="color:var(--bad)">△</b> 雨・強風</span><span>－ 営業前</span><span><i style="background:var(--bar)"></i>3日先まで</span><span><i style="background:var(--bar-far)"></i>4日目以降</span></div>
 <div class="card scroll">
 <table class="grid"><thead><tr><th class="name"></th>{{head}}</tr></thead><tbody>{{body}}</tbody></table>
 </div>
@@ -89,15 +94,16 @@ footer a{color:var(--muted)}
 
 <section>
 <h2>1か月先の計画用</h2>
-<p class="lead">過去10シーズンで、その日までに上部に降った雪の合計（11/1から）。太字は真ん中の年、「少」は少ない年（下から2割）。積もっている深さではなく降った量の合計で、気象庁の過去データとアメダスの実測で補正した目安です。週ごと・ゲレンデどうしの比較に使ってください。</p>
+<p class="lead">過去10シーズンで、その日までに上部に降った雪の合計（11/1から）。太字は真ん中の年、「少」は少ない年（下から2割）、「積雪」はふもとのアメダスの積雪の深さ（真ん中の年）。積もっている深さではなく降った量の合計で、気象庁の過去データとアメダスの実測で補正した目安です。週ごと・ゲレンデどうしの比較に使ってください。</p>
 <div class="card scroll">
 <table class="plan"><thead><tr><th class="name"></th>{{whead}}</tr></thead><tbody>{{pbody}}</tbody></table>
 </div>
 <div class="oms">{{onemonth}}</div>
 </section>
+<!--/grid-->
 
 <footer>
-予報：<a href="https://open-meteo.com/">Open-Meteo</a>（気象庁MSM・GSM、ECMWF、GFS。CC BY 4.0）を、アメダスの実測に合わせて補正して計算。観測・1か月予報・過去データ：気象庁。過去の累計降雪：ERA5（Copernicus、Open-Meteo経由）。個人用のページで、予報の正確さは保証しません。お出かけ前に公式発表を確認してください。
+予報：<a href="https://open-meteo.com/">Open-Meteo</a>（気象庁MSM・GSM、ECMWF、GFS。CC BY 4.0）を、アメダスの実測に合わせて補正して計算。観測・1か月予報・過去データ：気象庁。過去の累計降雪：最寄りのアメダスの降水量・気温を上部の標高に直し、同じ観測点の降雪量の実測で補正して計算。個人用のページで、予報の正確さは保証しません。お出かけ前に公式発表を確認してください。
 </footer>
 
 <div id="tip" role="tooltip"></div>

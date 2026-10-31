@@ -3,6 +3,8 @@ import datetime as dt
 import json
 import os
 import re
+import time
+from statistics import median
 
 import requests
 
@@ -21,30 +23,66 @@ def elevations(r):
     return {"upper": round(r["base"] + (r["top"] - r["base"]) * 0.75), "lower": r["base"]}
 
 
-def forecast(resorts):
-    """決定論の予報。上部とふもとを1回でまとめて取る。"""
-    lat, lon, ele = [], [], []
-    for r in resorts:
-        for e in elevations(r).values():
-            lat.append(r["lat"]); lon.append(r["lon"]); ele.append(e)
-    j = get("https://api.open-meteo.com/v1/forecast", params=dict(
-        latitude=",".join(map(str, lat)), longitude=",".join(map(str, lon)), elevation=",".join(map(str, ele)),
-        hourly="precipitation,temperature_2m,wind_gusts_10m", models=",".join(DET_MODELS),
-        forecast_days=16, timezone="Asia/Tokyo")).json()
-    out = {}
-    for i, r in enumerate(resorts):
-        out[r["id"]] = {"upper": j[2 * i]["hourly"], "lower": j[2 * i + 1]["hourly"]}
+def chunked(url, locs, params, size, pause):
+    """地点をまとめて取る。Open-Meteo の無料枠（1分600回・1時間5000回相当）に収まるよう分けて、間を空ける。"""
+    out = []
+    for i in range(0, len(locs), size):
+        part = locs[i:i + size]
+        q = dict(params, latitude=",".join(str(x[0]) for x in part), longitude=",".join(str(x[1]) for x in part),
+                 elevation=",".join(str(x[2]) for x in part))
+        for _ in range(6):
+            r = requests.get(url, params=q, headers=UA, timeout=180)
+            if r.status_code == 429:
+                print("429 待機", r.text[:100], flush=True); time.sleep(65); continue
+            r.raise_for_status(); break
+        j = r.json()
+        out += j if isinstance(j, list) else [j]
+        if i + size < len(locs):
+            time.sleep(pause)
     return out
 
 
+def forecast(resorts):
+    """決定論の予報。上部とふもと。"""
+    locs = [(r["lat"], r["lon"], e) for r in resorts for e in elevations(r).values()]
+    j = chunked("https://api.open-meteo.com/v1/forecast", locs, dict(
+        hourly="precipitation,temperature_2m,wind_gusts_10m", models=",".join(DET_MODELS),
+        forecast_days=16, timezone="Asia/Tokyo"), 100, 20)
+    return {r["id"]: {"upper": j[2 * i]["hourly"], "lower": j[2 * i + 1]["hourly"]} for i, r in enumerate(resorts)}
+
+
 def ensemble(resorts):
-    """ECMWF のアンサンブル（51通り）。上部だけ。"""
-    j = get("https://ensemble-api.open-meteo.com/v1/ensemble", params=dict(
-        latitude=",".join(str(r["lat"]) for r in resorts), longitude=",".join(str(r["lon"]) for r in resorts),
-        elevation=",".join(str(elevations(r)["upper"]) for r in resorts),
-        hourly="precipitation,temperature_2m", models="ecmwf_ifs025", forecast_days=15,
-        timezone="Asia/Tokyo")).json()
-    return {r["id"]: j[i]["hourly"] for i, r in enumerate(resorts)}
+    """ECMWF のアンサンブル（51通り）を上部の標高で取り、日ごとの値だけ残す（1日1回。重いので前の分を使い回す）。
+    {id: {date: {"sums": 51通りの夜の新雪 cm, "rain": 日中の雨の中央, "temp": 朝の気温の中央}}}"""
+    import build
+    path = "data/ens_daily.json"
+    if os.path.exists(path):
+        old = json.load(open(path, encoding="utf-8"))
+        made = dt.datetime.fromisoformat(old["made"])
+        if dt.datetime.now(JST) - made < dt.timedelta(hours=20):
+            return old["data"]
+    j = chunked("https://ensemble-api.open-meteo.com/v1/ensemble",
+                [(r["lat"], r["lon"], elevations(r)["upper"]) for r in resorts],
+                dict(hourly="precipitation,temperature_2m", models="ecmwf_ifs025", forecast_days=15,
+                     timezone="Asia/Tokyo"), 25, 65)
+    out = {}
+    for r, x in zip(resorts, j):
+        ms = build.ens_members(x["hourly"], build.P["scale"][build.fit_region(r)])
+        days = sorted({t[:10] for t in x["hourly"]["time"]})[1:]
+        res = {}
+        for ds in days:
+            d = dt.date.fromisoformat(ds)
+            w = [build.windows(m, d) for m in ms]
+            w = [(n, dy) for n, dy in w if len(n) >= 12]
+            if len(w) < 20:
+                continue
+            res[ds] = {"sums": sorted(round(sum(h["snow"] for h in n), 1) for n, _ in w),
+                       "rain": round(median(sum(h["rain"] for h in dy) for _, dy in w), 1),
+                       "temp": round(median(n[-1]["temp"] for n, _ in w), 1)}
+        out[r["id"]] = res
+    json.dump({"made": dt.datetime.now(JST).isoformat(timespec="minutes"), "data": out},
+              open(path, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    return out
 
 
 def amedas(ids):
@@ -71,18 +109,25 @@ def amedas(ids):
     return out
 
 
+# 地方1か月予報のファイル名の番号（発表する気象台）→ 地方
+ONEMONTH_AREAS = {"016000": "北海道", "040000": "東北", "130000": "関東甲信", "150000": "北陸", "230000": "東海",
+                  "270000": "近畿", "340000": "中国", "370000": "四国", "400000": "九州北部"}
+
+
 def onemonth():
-    """気象庁の地方1か月予報（北陸・関東甲信）。発表文をそのまま使う。"""
+    """気象庁の地方1か月予報（全地方）。発表文をそのまま使う。キーは「北陸」「関東甲信」など。"""
     feed = get("https://www.data.jma.go.jp/developer/xml/feed/regular_l.xml").text
+    latest = {}
+    for u in sorted(set(re.findall(r"https://[^<\"]+_VPCK50_\d+\.xml", feed))):
+        latest[u.rsplit("_", 1)[1]] = u  # 同じ地方は新しい方（ファイル名が日時順）
     out = {}
-    for area, code in (("北陸", "150000"), ("関東甲信", "130000")):
-        urls = sorted(set(re.findall(rf"https://[^<\"]+_VPCK50_{code}\.xml", feed)))
-        if not urls:
+    for code, u in latest.items():
+        name = ONEMONTH_AREAS.get(code.split(".")[0])
+        if not name:
             continue
-        x = get(urls[-1]).content.decode("utf-8")
-        res = {"url": urls[-1], "issued": re.search(r"<ReportDateTime>([^<]+)", x).group(1),
-               "text": re.findall(r"<jmx_eb:Text[^>]*>([^<]+)</jmx_eb:Text>", x)}
-        out[area] = res
+        x = get(u).content.decode("utf-8")
+        out[name] = {"url": u, "issued": re.search(r"<ReportDateTime>([^<]+)", x).group(1),
+                     "text": re.findall(r"<jmx_eb:Text[^>]*>([^<]+)</jmx_eb:Text>", x)}
     return out
 
 
