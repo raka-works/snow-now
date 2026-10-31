@@ -99,6 +99,11 @@ def main():
             print(f"{name} の取得に失敗: {e}")
             data[name] = None
     os.makedirs("data", exist_ok=True)
+    # 1か月予報は週1回の発表で、フィードから消えることがあるので、取れた最新を残しておく
+    if data["onemonth"]:
+        json.dump(data["onemonth"], open("data/onemonth.json", "w", encoding="utf-8"), ensure_ascii=False)
+    elif os.path.exists("data/onemonth.json"):
+        data["onemonth"] = json.load(open("data/onemonth.json", encoding="utf-8"))
     json.dump(data, open("data/latest.json", "w", encoding="utf-8"), ensure_ascii=False)
     print("ok", now)
 
