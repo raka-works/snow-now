@@ -149,6 +149,13 @@ def fit(data, seasons):
     for L in LEADS:
         b, o = blend_arr(data, P, L, seasons)
         P["prob"][L] = {th: logistic(b, o >= th) for th in (10, 20)}
+    # パウダーと出す確率の境目：決めた冬で「20cm以上」を一番よく当てる（CSI 最大）値
+    P["pthr"] = {}
+    for L in LEADS:
+        b, o = blend_arr(data, P, L, seasons)
+        ok = ~np.isnan(b) & ~np.isnan(o)
+        p = prob(b[ok], P["prob"][L][20])
+        P["pthr"][L] = max(np.arange(0.2, 0.71, 0.05), key=lambda t: scores(np.where(p >= t, 20, 0), o[ok])["csi"] or 0)
     return P
 
 
@@ -197,7 +204,7 @@ def evaluate(data, P, season):
             s = scores(S, d["obs"][s_])
             if s:
                 base[m] = s
-        res[L] = {"blend": scores(b, o), "powder": scores(np.where(p >= .5, 20, 0), o),
+        res[L] = {"blend": scores(b, o), "powder": scores(np.where(p >= P["pthr"][L], 20, 0), o),
                   "brier_skill": round(1 - brier / float(np.mean((clim - y) ** 2)), 3), "reliability": rel, "baseline": base}
     return res
 
@@ -206,7 +213,8 @@ def jsonable(P):
     return {"tbias": dict(zip(MODELS, map(lambda x: round(float(x), 2), P["tbias"]))), "snow": P["snow"],
             "scale": {r: dict(zip(MODELS, map(lambda x: round(float(x), 3), P["scale"][i]))) for i, r in enumerate(REGIONS)},
             "weight": {str(L): dict(zip(MODELS, map(lambda x: round(float(x), 5), w))) for L, w in P["weight"].items()},
-            "prob": {str(L): {str(t): c for t, c in v.items()} for L, v in P["prob"].items()}}
+            "prob": {str(L): {str(t): c for t, c in v.items()} for L, v in P["prob"].items()},
+            "pthr": {str(L): round(float(v), 2) for L, v in P["pthr"].items()}}
 
 
 def main():

@@ -127,7 +127,9 @@ def judge(lead, rain, gust, temp, prob, opened):
         return "bad", "雨"
     if gust is not None and gust >= 20 and lead <= 3:
         return "bad", "強風"
-    if prob is not None and prob >= 0.5 and (temp is None or temp <= -2):
+    # 7日先までは verify2.py で決めた境目、8日目以降（51通りの割合）は半分以上
+    thr = P["pthr"][str(min(LEADS, key=lambda x: (abs(x - lead), x)))] if lead <= 7 else 0.5
+    if prob is not None and prob >= thr and (temp is None or temp <= -2):
         return "powder", "パウダー"
     return "ok", "滑れる"
 
