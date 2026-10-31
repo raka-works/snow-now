@@ -1,0 +1,6 @@
+[out:json][timeout:90];
+(
+ way["landuse"="winter_sports"](36.4,137.7,37.1,139.0);
+ relation["landuse"="winter_sports"](36.4,137.7,37.1,139.0);
+);
+out tags center;

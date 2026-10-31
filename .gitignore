@@ -1,0 +1,6 @@
+data/latest.json
+data/test_latest.json
+data/verify/*.json
+__pycache__/
+設計.md
+tools/verify.log
