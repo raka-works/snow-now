@@ -189,7 +189,7 @@ def plan_stats(c, day):
     gap, v = min(((abs(sday(int(k[:2]), int(k[3:])) - t), v) for k, v in c["weeks"].items()), key=lambda x: x[0])
     if gap > 4:
         return None
-    return {"median": v[0], "low": v[1], "depth": v[2]}
+    return {"median": v[0], "low": v[1], "depth": v[2], "big": v[3] if len(v) > 3 else None}
 
 
 def main():
@@ -411,7 +411,8 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
                 tds.append('<td class="na">-</td>')
                 continue
             dep = f'・麓 {fmt_cm(s["depth"])}' if s["depth"] is not None else ""
-            tds.append(f'<td><b>{fmt_cm(s["median"])}</b><span class="sub">少 {fmt_cm(s["low"])}{dep}</span></td>')
+            big = f'<span class="sub pw">20cm↑ {s["big"]:.1f}日</span>' if s.get("big") is not None else ""
+            tds.append(f'<td><b>{fmt_cm(s["median"])}</b><span class="sub">少 {fmt_cm(s["low"])}{dep}</span>{big}</td>')
         ds = (CLIM.get(r["id"]) or {}).get("depth_station")
         st = (f'<span class="sub">麓＝{esc(ds["name"])}（{ds["alt"]}m・{ds["km"]}km先）の積雪</span>'
               if ds and any(s and s["depth"] is not None for s in plan[r["id"]]) else "")

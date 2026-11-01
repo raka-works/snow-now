@@ -86,7 +86,8 @@ def main():
         for md in sorted(keys):
             med = sum(p[0] * p[3][md][0] for p in per) / tw
             low = sum(p[0] * p[3][md][1] for p in per) / tw
-            weeks[md] = [round(med), round(low), None]
+            big = sum(p[0] * p[3][md][3] for p in per) / tw
+            weeks[md] = [round(med), round(low), None, round(big, 1)]
         # 麓の積雪は一番点の良い観測点のもの（名前・標高を一緒に出す）
         best = per[0]
         for md in weeks:
@@ -111,18 +112,20 @@ def station_weeks(rows, c, shift):
     for w in range(26):
         md = (start + dt.timedelta(days=7 * w)).strftime("%m-%d")
         m, dd = int(md[:2]), int(md[3:])
-        cums, depths = [], []
+        cums, depths, big = [], [], []
         for season, days in seasons.items():
             target = dt.date(season if m >= 7 else season + 1, m, dd)
             upto = [(d, s, dep) for d, s, dep in days if dt.date(season, 11, 1) <= d <= target]
             if not upto or upto[-1][0] != target:
                 continue
             cums.append(sum(s for _, s, _ in upto))
+            big.append(sum(1 for d, s, _ in upto if (target - d).days < 7 and s >= 20))
             if upto[-1][2] is not None:
                 depths.append(upto[-1][2])
         if len(cums) >= 5:
             cums.sort()
-            weeks[md] = [round(median(cums)), round(cums[int(len(cums) * 0.2)]), round(median(depths)) if len(depths) >= 5 else None]
+            weeks[md] = [round(median(cums)), round(cums[int(len(cums) * 0.2)]), round(median(depths)) if len(depths) >= 5 else None,
+                         round(sum(big) / len(big), 2)]
     return weeks
 
 

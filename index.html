@@ -62,6 +62,7 @@ td.lv-closed .bar i{opacity:.55}
 .plan td{padding:6px 8px;vertical-align:top;text-align:right;min-width:72px}
 .plan td b{font-size:15px}
 .plan td .sub{font-size:11px}
+.plan td .sub.pw{color:var(--powder)}
 .plan thead th{min-width:72px;text-align:right;padding-right:8px}
 .oms{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:12px}
 .om h3{font-size:14px;margin:0 0 4px}
@@ -121,6 +122,10 @@ document.querySelectorAll('[data-tip]').forEach(el=>{
  el.addEventListener('mouseleave',()=>tip.style.display='none');el.addEventListener('blur',()=>tip.style.display='none');});
 addEventListener('scroll',()=>tip.style.display='none',true);
 const FK='snow-now-fav';
+const AL={はくば:'白馬',ゆざわ:'湯沢',なえば:'苗場',しが:'志賀',のざわ:'野沢',みょうこう:'妙高',ざおう:'蔵王',はっぽう:'八方',つがいけ:'栂池',とがくし:'戸隠',あっぴ:'安比',かたしな:'片品',まるぬま:'丸沼',てんじん:'天神',たにがわ:'谷川',ほたか:'武尊',かわば:'川場',おぜ:'尾瀬',いいやま:'飯山',おたり:'小谷',ひだ:'飛騨',ぐじょう:'郡上',いぶき:'伊吹',びわこ:'びわ湖',ひるぜん:'蒜山',だいせん:'大山',ふらの:'富良野',あさひだけ:'旭岳',さっぽろ:'札幌',おたる:'小樽',はちまんたい:'八幡平',ばんだい:'磐梯',いなわしろ:'猪苗代',がっさん:'月山',はっこうだ:'八甲田',あおもり:'青森',いわて:'岩手',みやぎ:'宮城',やまがた:'山形',ふくしま:'福島',にいがた:'新潟',ながの:'長野',ぐんま:'群馬',とちぎ:'栃木',ぎふ:'岐阜',とやま:'富山',いしかわ:'石川',ふくい:'福井',ほっかいどう:'北海道'};
+const KN=s=>s.normalize('NFKC').toLowerCase().replace(/[ぁ-ん]/g,c=>String.fromCharCode(c.charCodeAt(0)+96));
+// ?fav=id,id のリンクで開くと、お気に入りを取り込む（スマホとPCで同じにする用）
+try{const u=new URLSearchParams(location.search).get('fav');if(u){const f=JSON.parse(localStorage.getItem(FK)||'[]');u.split(',').forEach(x=>{if(/^r\d+$/.test(x)&&!f.includes(x))f.push(x)});localStorage.setItem(FK,JSON.stringify(f));history.replaceState(null,'',location.pathname);}}catch(e){}
 function favs(){try{return JSON.parse(localStorage.getItem(FK)||'[]')}catch(e){return []}}
 function setFavs(a){try{localStorage.setItem(FK,JSON.stringify(a))}catch(e){}}
 function paintStars(){const f=favs();document.querySelectorAll('button.fav').forEach(b=>{const on=f.includes(b.dataset.id);b.classList.toggle('on',on);b.textContent=on?'★':'☆';});}
@@ -132,12 +137,12 @@ if(typeof IDX!=='undefined'){
  const lab={p:'❄',o:'○',b:'△',c:'－'};
  window.drawFavs=function(){const f=favs(),box=document.getElementById('favs'),rs=IDX.filter(x=>f.includes(x.id));
   if(!rs.length){box.innerHTML='<p class="none">まだありません。下の検索や各地域のページで ☆ を押してください</p>';return;}
+  const link=location.origin+location.pathname+'?fav='+f.join(',');
   box.innerHTML='<div class="row"><span></span>'+DH.map(h=>'<span class="h">'+esc(h)+'</span>').join('')+'<span></span></div>'+rs.map(x=>'<div class="row"><span><a href="r/'+x.s+'.html#'+x.id+'">'+esc(x.n)+'</a><span class="sub">'+esc(x.p+'・'+x.o)+'</span></span>'+
-   x.d.map(c=>c?'<span class="d '+c[1]+'">'+(c[1]==='c'?'－':(c[0]>=1?c[0]:lab[c[1]]))+'</span>':'<span class="d"></span>').join('')+'<button class="fav" data-id="'+x.id+'" aria-label="お気に入り">☆</button></div>').join('');paintStars();};
+   x.d.map(c=>c?'<span class="d '+c[1]+'">'+(c[1]==='c'?'－':(c[0]>=1?c[0]:lab[c[1]]))+'</span>':'<span class="d"></span>').join('')+'<button class="fav" data-id="'+x.id+'" aria-label="お気に入り">☆</button></div>').join('')+'<p class="note">ほかの端末でも同じお気に入りにするには、このリンクを開く：<a href="'+esc(link)+'">'+esc(link)+'</a></p>';paintStars();};
  drawFavs();
  const q=document.getElementById('q'),hits=document.getElementById('hits');
  const norm=s=>s.normalize('NFKC').toLowerCase().replace(/[ぁ-ん]/g,c=>String.fromCharCode(c.charCodeAt(0)+96));
- const AL={はくば:'白馬',ゆざわ:'湯沢',なえば:'苗場',しが:'志賀',のざわ:'野沢',みょうこう:'妙高',ざおう:'蔵王',はっぽう:'八方',つがいけ:'栂池',とがくし:'戸隠',あっぴ:'安比',かたしな:'片品',まるぬま:'丸沼',てんじん:'天神',たにがわ:'谷川',ほたか:'武尊',かわば:'川場',おぜ:'尾瀬',いいやま:'飯山',おたり:'小谷',ひだ:'飛騨',ぐじょう:'郡上',いぶき:'伊吹',びわこ:'びわ湖',ひるぜん:'蒜山',だいせん:'大山',てしお:'天塩',ふらの:'富良野',あさひだけ:'旭岳',さっぽろ:'札幌',おたる:'小樽',はちまんたい:'八幡平',ばんだい:'磐梯',いなわしろ:'猪苗代',がっさん:'月山',はっこうだ:'八甲田',あおもり:'青森',いわて:'岩手',みやぎ:'宮城',やまがた:'山形',ふくしま:'福島',にいがた:'新潟',ながの:'長野',ぐんま:'群馬',とちぎ:'栃木',ぎふ:'岐阜',とやま:'富山',いしかわ:'石川',ふくい:'福井',ほっかいどう:'北海道'};
  q.addEventListener('input',()=>{const raw=q.value.trim(),t=norm(AL[raw]||raw);if(!raw){hits.innerHTML='';return;}
   const rs=IDX.filter(x=>norm(x.n+' '+x.p+' '+x.a).includes(t)).slice(0,30);
   hits.innerHTML=rs.length?rs.map(x=>'<li><button class="fav" data-id="'+x.id+'" aria-label="お気に入り">☆</button><a href="r/'+x.s+'.html#'+x.id+'"><b>'+esc(x.n)+'</b><span class="sub">'+esc(x.p+'・'+x.a+'・'+x.o)+'</span></a></li>').join(''):'<li class="none">見つかりません</li>';paintStars();});
@@ -147,8 +152,8 @@ if(tb&&sel){const rows=[...tb.children];
  function apply(){const k=sel.value,only=pow.checked;
   const rs=rows.filter(r=>r.id).sort((a,b)=>k==='we'?b.dataset.we-a.dataset.we:k==='drive'?a.dataset.drive-b.dataset.drive:a.dataset.i-b.dataset.i);
   tb.replaceChildren(...(k==='i'?rows:rs));
-  const a=ar.value,fv=fo.checked,F=favs(),t=rq.value.trim().normalize('NFKC').toLowerCase();
-  const hit=r=>!t||r.querySelector('th').textContent.normalize('NFKC').toLowerCase().includes(t);
+  const a=ar.value,fv=fo.checked,F=favs(),t0=rq.value.trim(),t=KN(AL[t0]||t0);
+  const hit=r=>!t||KN(r.querySelector('th').textContent).includes(t);
   rows.forEach(r=>{r.hidden=(a&&r.dataset.area!==a)||(r.id?((only&&r.dataset.pow!=='1')||(fv&&!F.includes(r.id))||!hit(r)):(k!=='i'||only||fv||!!t))});
   if(pb)[...pb.children].forEach(r=>{r.hidden=(!!a&&r.dataset.area!==a)||(r.dataset.id?((fv&&!F.includes(r.dataset.id))||!hit(r)):(fv||!!t))});}
  sel.addEventListener('change',apply);pow.addEventListener('change',apply);ar.addEventListener('change',apply);fo.addEventListener('change',apply);rq.addEventListener('input',apply);window.applyRows=apply;}
