@@ -71,6 +71,20 @@ nav.regions{max-width:1100px;margin:0 auto;padding:0 16px 8px;display:flex;flex-
 nav.regions a{font-size:13px;padding:4px 10px;border:1px solid var(--axis);border-radius:999px;color:inherit;text-decoration:none}
 nav.regions a[aria-current]{background:var(--ink);color:var(--page)}
 .picks a{color:inherit;text-decoration:none;display:block}
+button.fav{background:none;border:0;padding:0 4px 0 0;font-size:15px;line-height:1;color:var(--muted);cursor:pointer}
+button.fav.on{color:#e0a100}
+#q{width:100%;font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--axis);background:var(--page);color:var(--ink);margin:4px 0 8px}
+.hits li{grid-template-columns:auto 1fr}
+.favs{display:grid;gap:10px}
+.favs .row{display:grid;grid-template-columns:minmax(110px,1fr) repeat(7,minmax(30px,40px)) auto;gap:2px;align-items:center;font-size:12px}
+.favs .row a{color:inherit;font-weight:700;text-decoration:none}
+.favs .row .sub{font-size:11px}
+.favs .d{text-align:center;padding:4px 0;border-radius:4px;background:var(--we)}
+.favs .d.p{background:var(--powder-bg);color:var(--powder);font-weight:700}
+.favs .d.b{color:var(--bad)}
+.favs .d.c{color:var(--axis)}
+.favs .h{text-align:center;color:var(--muted);font-size:11px}
+.none{color:var(--ink2)}
 footer{max-width:1100px;margin:0 auto;padding:8px 16px 32px;font-size:11px;color:var(--muted)}
 footer a{color:var(--muted)}
 </style>
@@ -94,7 +108,7 @@ footer a{color:var(--muted)}
 <h2>2週間の新雪（ゲレンデ上部）</h2>
 <p class="lead">数字はその日の朝まで（前日9時〜当日9時）に積もる新雪の cm。4日先からは薄い色（7日先まで確かめた範囲だが外れやすい）。8日先からは51通りの予報の中央値で、確かめていない目安（パウダーの印は付けない。7日先までと計算が違うので、境目で数字がとぶことがあります）。マスを押すと詳しい値が出ます。</p>
 <div class="legend"><span><b style="color:var(--powder)">❄</b> パウダー</span><span>○ 滑れる</span><span><b style="color:var(--bad)">△</b> 雨・強風</span><span>－ 営業していない（オープン・終了日は発表か去年の日から推定）</span><span><i style="background:var(--bar)"></i>3日先まで</span><span><i style="background:var(--bar-far)"></i>4〜7日先</span><span><i style="border:1.5px dashed var(--bar-far)"></i>8日先から（目安）</span></div>
-<div class="tools"><label>エリア <select id="area"><option value="">すべて</option>{{areas}}</select></label><label>並べ替え <select id="sort"><option value="i">地域順</option><option value="we">今週末の新雪が多い順</option><option value="drive">東京から近い順</option></select></label><label><input type="checkbox" id="pow"> 7日以内にパウダーの見込みがある所だけ</label></div>
+<div class="tools"><label>エリア <select id="area"><option value="">すべて</option>{{areas}}</select></label><label>並べ替え <select id="sort"><option value="i">地域順</option><option value="we">今週末の新雪が多い順</option><option value="drive">東京から近い順</option></select></label><label><input type="checkbox" id="pow"> 7日以内にパウダーの見込みがある所だけ</label><label><input type="checkbox" id="favonly"> お気に入りだけ</label></div>
 <div class="card scroll">
 <table class="grid"><thead><tr><th class="name"></th>{{head}}</tr></thead><tbody>{{body}}</tbody></table>
 </div>
@@ -126,15 +140,36 @@ document.querySelectorAll('[data-tip]').forEach(el=>{
  el.addEventListener('click',()=>show(el));
  el.addEventListener('mouseleave',()=>tip.style.display='none');el.addEventListener('blur',()=>tip.style.display='none');});
 addEventListener('scroll',()=>tip.style.display='none',true);
-const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow'),ar=document.getElementById('area'),pb=document.querySelector('table.plan tbody');
+const FK='snow-now-fav';
+function favs(){try{return JSON.parse(localStorage.getItem(FK)||'[]')}catch(e){return []}}
+function setFavs(a){try{localStorage.setItem(FK,JSON.stringify(a))}catch(e){}}
+function paintStars(){const f=favs();document.querySelectorAll('button.fav').forEach(b=>{const on=f.includes(b.dataset.id);b.classList.toggle('on',on);b.textContent=on?'★':'☆';});}
+document.addEventListener('click',e=>{const b=e.target.closest('button.fav');if(!b)return;e.preventDefault();e.stopPropagation();
+ const f=favs(),i=f.indexOf(b.dataset.id);i<0?f.push(b.dataset.id):f.splice(i,1);setFavs(f);paintStars();if(window.drawFavs)drawFavs();if(window.applyRows)applyRows();});
+paintStars();
+if(typeof IDX!=='undefined'){
+ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ const lab={p:'❄',o:'○',b:'△',c:'－'};
+ window.drawFavs=function(){const f=favs(),box=document.getElementById('favs'),rs=IDX.filter(x=>f.includes(x.id));
+  if(!rs.length){box.innerHTML='<p class="none">まだありません。下の検索や各地域のページで ☆ を押してください</p>';return;}
+  box.innerHTML='<div class="row"><span></span>'+DH.map(h=>'<span class="h">'+esc(h)+'</span>').join('')+'<span></span></div>'+rs.map(x=>'<div class="row"><span><a href="r/'+x.s+'.html#'+x.id+'">'+esc(x.n)+'</a><span class="sub">'+esc(x.p+'・'+x.o)+'</span></span>'+
+   x.d.map(c=>c?'<span class="d '+c[1]+'">'+(c[1]==='c'?'－':(c[0]>=1?c[0]:lab[c[1]]))+'</span>':'<span class="d"></span>').join('')+'<button class="fav" data-id="'+x.id+'" aria-label="お気に入り">☆</button></div>').join('');paintStars();};
+ drawFavs();
+ const q=document.getElementById('q'),hits=document.getElementById('hits');
+ const norm=s=>s.normalize('NFKC').toLowerCase().replace(/[ぁ-ん]/g,c=>String.fromCharCode(c.charCodeAt(0)+96));
+ q.addEventListener('input',()=>{const t=norm(q.value.trim());if(!t){hits.innerHTML='';return;}
+  const rs=IDX.filter(x=>norm(x.n+' '+x.p+' '+x.a).includes(t)).slice(0,30);
+  hits.innerHTML=rs.length?rs.map(x=>'<li><button class="fav" data-id="'+x.id+'" aria-label="お気に入り">☆</button><a href="r/'+x.s+'.html#'+x.id+'"><b>'+esc(x.n)+'</b><span class="sub">'+esc(x.p+'・'+x.a+'・'+x.o)+'</span></a></li>').join(''):'<li class="none">見つかりません</li>';paintStars();});
+}
+const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow'),ar=document.getElementById('area'),pb=document.querySelector('table.plan tbody'),fo=document.getElementById('favonly');
 if(tb&&sel){const rows=[...tb.children];
  function apply(){const k=sel.value,only=pow.checked;
   const rs=rows.filter(r=>r.id).sort((a,b)=>k==='we'?b.dataset.we-a.dataset.we:k==='drive'?a.dataset.drive-b.dataset.drive:a.dataset.i-b.dataset.i);
   tb.replaceChildren(...(k==='i'?rows:rs));
-  const a=ar.value;
-  rows.forEach(r=>{r.hidden=(a&&r.dataset.area!==a)||(r.id?(only&&r.dataset.pow!=='1'):(k!=='i'||only))});
+  const a=ar.value,fv=fo.checked,F=favs();
+  rows.forEach(r=>{r.hidden=(a&&r.dataset.area!==a)||(r.id?((only&&r.dataset.pow!=='1')||(fv&&!F.includes(r.id))):(k!=='i'||only||fv))});
   if(pb)[...pb.children].forEach(r=>{r.hidden=!!a&&r.dataset.area!==a});}
- sel.addEventListener('change',apply);pow.addEventListener('change',apply);ar.addEventListener('change',apply);}
+ sel.addEventListener('change',apply);pow.addEventListener('change',apply);ar.addEventListener('change',apply);fo.addEventListener('change',apply);window.applyRows=apply;}
 </script>
 </body>
 </html>

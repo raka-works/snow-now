@@ -52,7 +52,7 @@ def forecast(resorts):
     locs = [(r["lat"], r["lon"], e) for r in resorts for e in elevations(r).values()]
     j = chunked("https://api.open-meteo.com/v1/forecast", locs, dict(
         hourly="precipitation,temperature_2m,wind_gusts_10m", models=",".join(DET_MODELS),
-        forecast_days=16, timezone="Asia/Tokyo"), 100, 20)
+        forecast_days=9, timezone="Asia/Tokyo"), 100, 20)  # 8日目以降はアンサンブルを使うので9日分で足りる（枠の節約）
     return {r["id"]: {"upper": j[2 * i]["hourly"], "lower": j[2 * i + 1]["hourly"]} for i, r in enumerate(resorts)}
 
 

@@ -320,8 +320,26 @@ def render_index(now, days, rows):
         pw = len({x["r"]["id"] for x in rr for c in x["cells"] if c and c["lv"] == "powder" and c["lead"] <= 7})
         counts.append(f'<li><a href="r/{s}.html"><b>{n}</b><span class="sub">{len(rr)}か所'
                       + (f'・7日以内にパウダーの見込み {pw}か所' if pw else "") + '</span></a></li>')
-    body = ('<section><h2>地域を選ぶ</h2><ul class="picks">' + "".join(counts) + "</ul></section>"
-            f'<section><p class="note">{esc(accuracy())}</p></section>')
+    lvc = {"powder": "p", "ok": "o", "bad": "b", "closed": "c"}
+    idx = [{"id": x["r"]["id"], "n": x["r"]["name"], "p": x["r"]["pref"], "a": x["r"]["area"],
+            "s": dict(PAGES)[x["r"]["region"]], "o": opening_text(x, now),
+            "d": [[c["new"], lvc[c["lv"]]] if c else None for c in x["cells"][:7]]} for x in rows]
+    dhead = [f"{d.month}/{d.day}{WEEK[d.weekday()]}" for d in days[:7]]
+    top7 = sorted(rows, key=lambda x: -sum(c["new"] for c in x["cells"][:7] if c))[:10]
+    snowy = "".join(
+        f'<li><a href="r/{dict(PAGES)[x["r"]["region"]]}.html#{x["r"]["id"]}"><b>{esc(x["r"]["name"])}</b>'
+        f'<span class="sub">{esc(x["r"]["pref"])}・7日間で{sum(c["new"] for c in x["cells"][:7] if c)}cm・{esc(opening_text(x, now))}</span></a></li>'
+        for x in top7 if sum(c["new"] for c in x["cells"][:7] if c) > 0) or '<li class="none">7日以内に新雪の見込みがあるゲレンデはありません</li>'
+    body = ('<section><div class="card"><h2>お気に入り</h2><p class="lead">各ページの ☆ を押すと、ここに7日分が出ます（この端末のブラウザに保存）</p>'
+            '<div id="favs" class="favs"><p class="none">まだありません</p></div></div></section>'
+            '<section><div class="card"><h2>ゲレンデを探す</h2>'
+            '<input id="q" type="search" placeholder="名前・県・エリア（例：白馬、新潟、ニセコ）" autocomplete="off">'
+            '<ul id="hits" class="picks hits"></ul></div></section>'
+            '<section><h2>7日間の新雪が多いゲレンデ（全国・営業前も含む）</h2><p class="lead">雪の付き具合の目安。営業しているかは各ゲレンデの表示を見てください</p>'
+            f'<ul class="picks">{snowy}</ul></section>'
+            '<section><h2>地域を選ぶ</h2><ul class="picks">' + "".join(counts) + "</ul></section>"
+            f'<section><p class="note">{esc(accuracy())}</p></section>'
+            f'<script>const IDX={json.dumps(idx, ensure_ascii=False, separators=(",", ":"))},DH={json.dumps(dhead, ensure_ascii=False)};</script>')
     return fill(head + body + tail, now, "全国", "", weekend_picks(rows, days, 10, ""), "今週末のおすすめ（全国）")
 
 
@@ -366,22 +384,14 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
         am = row["amedas"]
         now_snow = (f'{r.get("amedas_name") or ""}（{r.get("amedas_alt", "")}m）積雪 {am["snow"]}cm'
                     + (f'・24時間で+{am["snow24h"]}cm' if am.get("snow24h") else "")) if am.get("snow") is not None else ""
-        od = row["open"]
-        if od is None:
-            opening = "オープン日不明"
-        else:
-            how = {"last": "（去年の日から推定）", "area": "（周りのゲレンデから推定）"}.get(row["est"], "")
-            cl = row["close"]
-            opening = (f'{od.month}/{od.day}{"ごろ" if how else ""}〜{how}' if od > now.date()
-                       else "営業終了（去年の日から推定）" if cl and now.date() > cl
-                       else "営業中" + ("（推定）" if how else "") + (f'・{cl.month}/{cl.day}ごろまで' if cl and (cl - now.date()).days <= 30 else ""))
+        opening = opening_text(row, now)
         drive = f'・東京から車{r["drive_h"]}時間' if r.get("drive_h") and r["drive_h"] <= 8 else ""
         if ri == 0 or r["area"] != rows[ri - 1]["r"]["area"]:
             body.append(f'<tr class="area" data-area="{esc(r["area"])}"><th class="name">{esc(r["area"])}</th><td colspan="{len(days)}"></td></tr>')
         wk = [c["new"] for d, c in zip(days, row["cells"]) if c and d.weekday() >= 5 and c["lv"] in ("powder", "ok")][:2]
         pw = any(c and c["lv"] == "powder" and c["lead"] <= 7 for c in row["cells"])
         body.append(f'<tr id="{r["id"]}" data-area="{esc(r["area"])}" data-i="{ri}" data-we="{max(wk, default=-1)}" data-drive="{r.get("drive_h") or 99}" data-pow="{int(pw)}">'
-                    f'<th class="name"><a href="{esc(r["url"])}" target="_blank" rel="noopener">{esc(r["name"])}</a>'
+                    f'<th class="name"><button class="fav" data-id="{r["id"]}" aria-label="お気に入り">☆</button><a href="{esc(r["url"])}" target="_blank" rel="noopener">{esc(r["name"])}</a>'
                     f'<span class="sub">{opening}{drive}{"・" + esc(now_snow) if now_snow else ""}</span></th>{"".join(tds)}</tr>')
 
     # 1か月先
@@ -413,6 +423,19 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
             .replace("{{head}}", head).replace("{{body}}", "".join(body))
             .replace("{{whead}}", whead).replace("{{pbody}}", "".join(pbody)).replace("{{onemonth}}", "".join(om))
             .replace("{{accuracy}}", esc(accuracy())))
+
+
+def opening_text(row, now):
+    od = row["open"]
+    if od is None:
+        return "オープン日不明"
+    how = {"last": "（去年の日から推定）", "area": "（周りのゲレンデから推定）"}.get(row["est"], "")
+    cl = row["close"]
+    if od > now.date():
+        return f'{od.month}/{od.day}{"ごろ" if how else ""}〜{how}'
+    if cl and now.date() > cl:
+        return "営業終了（去年の日から推定）"
+    return "営業中" + ("（推定）" if how else "") + (f'・{cl.month}/{cl.day}ごろまで' if cl and (cl - now.date()).days <= 30 else "")
 
 
 def fmt_cm(x):
