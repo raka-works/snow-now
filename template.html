@@ -29,7 +29,9 @@ h2{font-size:17px;margin:0 0 4px}
 .lv.lv-ok{background:var(--we);color:var(--ink2)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink2);margin:0 0 10px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
-.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.scroll{overflow:auto;-webkit-overflow-scrolling:touch;max-height:80vh}
+thead th{position:sticky;top:0;z-index:2;background:var(--surface)}
+thead th.name{z-index:3}
 table{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums}
 th,td{padding:0}
 thead th{font-size:11px;font-weight:400;color:var(--muted);text-align:center;padding:4px 0;border-bottom:1px solid var(--axis);min-width:34px}
@@ -88,9 +90,9 @@ footer a{color:var(--muted)}
 <!--grid-->
 <section>
 <h2>2週間の新雪（ゲレンデ上部）</h2>
-<p class="lead">数字はその日の朝まで（前日9時〜当日9時）に積もる新雪の cm。4日先からは薄い色（7日先まで確かめた範囲だが外れやすい）。8日先からは51通りの予報の中央値で、確かめていない目安。マスを押すと詳しい値が出ます。</p>
+<p class="lead">数字はその日の朝まで（前日9時〜当日9時）に積もる新雪の cm。4日先からは薄い色（7日先まで確かめた範囲だが外れやすい）。8日先からは51通りの予報の中央値で、確かめていない目安（パウダーの印は付けない）。マスを押すと詳しい値が出ます。</p>
 <div class="legend"><span><b style="color:var(--powder)">❄</b> パウダー</span><span>○ 滑れる</span><span><b style="color:var(--bad)">△</b> 雨・強風</span><span>－ 営業前（オープン日は発表か推定）</span><span><i style="background:var(--bar)"></i>3日先まで</span><span><i style="background:var(--bar-far)"></i>4日先から</span></div>
-<div class="tools"><label>並べ替え <select id="sort"><option value="i">地域順</option><option value="we">今週末の新雪が多い順</option><option value="drive">東京から近い順</option></select></label><label><input type="checkbox" id="pow"> 7日以内にパウダーの見込みがある所だけ</label></div>
+<div class="tools"><label>エリア <select id="area"><option value="">すべて</option>{{areas}}</select></label><label>並べ替え <select id="sort"><option value="i">地域順</option><option value="we">今週末の新雪が多い順</option><option value="drive">東京から近い順</option></select></label><label><input type="checkbox" id="pow"> 7日以内にパウダーの見込みがある所だけ</label></div>
 <div class="card scroll">
 <table class="grid"><thead><tr><th class="name"></th>{{head}}</tr></thead><tbody>{{body}}</tbody></table>
 </div>
@@ -99,7 +101,7 @@ footer a{color:var(--muted)}
 
 <section>
 <h2>1か月先の計画用</h2>
-<p class="lead">過去10シーズンで、その日までに上部に降った雪の合計（11/1から）。太字は真ん中の年、「少」は少ない年（下から2割）。積もっている深さではなく降った量の合計で、気象庁の過去データとアメダスの実測で補正した目安です。週ごと・ゲレンデどうしの比較に使ってください。</p>
+<p class="lead">過去10シーズンで、その日までに上部に降った雪の合計（11/1から）。太字は真ん中の年、「少」は少ない年（下から2割）、「麓」は最寄りのアメダスの積雪の深さ（真ん中の年。ゲレンデより低い場所の値で、雪が付き始める時期の目安）。積もっている深さではなく降った量の合計で、気象庁の過去データとアメダスの実測で補正した目安です。週ごと・ゲレンデどうしの比較に使ってください。</p>
 <div class="card scroll">
 <table class="plan"><thead><tr><th class="name"></th>{{whead}}</tr></thead><tbody>{{pbody}}</tbody></table>
 </div>
@@ -122,13 +124,15 @@ document.querySelectorAll('[data-tip]').forEach(el=>{
  el.addEventListener('click',()=>show(el));
  el.addEventListener('mouseleave',()=>tip.style.display='none');el.addEventListener('blur',()=>tip.style.display='none');});
 addEventListener('scroll',()=>tip.style.display='none',true);
-const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow');
+const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow'),ar=document.getElementById('area'),pb=document.querySelector('table.plan tbody');
 if(tb&&sel){const rows=[...tb.children];
  function apply(){const k=sel.value,only=pow.checked;
   const rs=rows.filter(r=>r.id).sort((a,b)=>k==='we'?b.dataset.we-a.dataset.we:k==='drive'?a.dataset.drive-b.dataset.drive:a.dataset.i-b.dataset.i);
   tb.replaceChildren(...(k==='i'?rows:rs));
-  rows.forEach(r=>{r.hidden=r.id?(only&&r.dataset.pow!=='1'):(k!=='i'||only)});}
- sel.addEventListener('change',apply);pow.addEventListener('change',apply);}
+  const a=ar.value;
+  rows.forEach(r=>{r.hidden=(a&&r.dataset.area!==a)||(r.id?(only&&r.dataset.pow!=='1'):(k!=='i'||only))});
+  if(pb)[...pb.children].forEach(r=>{r.hidden=!!a&&r.dataset.area!==a});}
+ sel.addEventListener('change',apply);pow.addEventListener('change',apply);ar.addEventListener('change',apply);}
 </script>
 </body>
 </html>

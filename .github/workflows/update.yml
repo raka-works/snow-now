@@ -2,6 +2,7 @@ name: update
 
 on:
   schedule:
+    - cron: "0 19 * * *"   # 4:00 アンサンブルだけ取る
     - cron: "30 20 * * *"  # 5:30（日本時間）
     - cron: "30 2 * * *"   # 11:30
     - cron: "30 8 * * *"   # 17:30
@@ -28,22 +29,29 @@ jobs:
           path: data/ens_daily.json
           key: ens-${{ github.run_id }}
           restore-keys: ens-
+      - name: アンサンブルだけ取る（4時の回）
+        if: github.event.schedule == '0 19 * * *'
+        run: python -u fetch.py ens
       - name: 予報と観測を取得
+        if: github.event.schedule != '0 19 * * *'
         run: |
           set -o pipefail
           python -u fetch.py 2>&1 | tee data/fetch_log.txt
       - name: ページを作る
+        if: github.event.schedule != '0 19 * * *'
         run: python build.py
       - name: パウダーなら通知
+        if: github.event.schedule != '0 19 * * *'
         continue-on-error: true  # 通知が失敗してもページは保存する
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: python notify.py
       - name: 保存
+        if: github.event.schedule != '0 19 * * *'
         run: |
           git config user.name "raka-works"
           git config user.email "raka-works@users.noreply.github.com"
-          git rm -q --cached --ignore-unmatch data/fetch_log.txt; git add index.html r data/summary.json data/notified.json data/onemonth.json
+          git rm -q --cached --ignore-unmatch data/fetch_log.txt; git rm -q --cached --ignore-unmatch data/summary.json; git add index.html r data/notified.json data/onemonth.json
           git diff --cached --quiet || git commit -m "update $(date -u +%FT%H:%MZ)"
           git push
       - name: 失敗したら取得のログを残す（Actions のログは外から読めないため）

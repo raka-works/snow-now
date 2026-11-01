@@ -29,7 +29,9 @@ h2{font-size:17px;margin:0 0 4px}
 .lv.lv-ok{background:var(--we);color:var(--ink2)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink2);margin:0 0 10px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
-.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.scroll{overflow:auto;-webkit-overflow-scrolling:touch;max-height:80vh}
+thead th{position:sticky;top:0;z-index:2;background:var(--surface)}
+thead th.name{z-index:3}
 table{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums}
 th,td{padding:0}
 thead th{font-size:11px;font-weight:400;color:var(--muted);text-align:center;padding:4px 0;border-bottom:1px solid var(--axis);min-width:34px}
@@ -82,7 +84,7 @@ footer a{color:var(--muted)}
 <div class="card">
 <h2>今週末のおすすめ（全国）</h2>
 <p class="lead">土日の朝の新雪が多い順</p>
-<ul class="picks"><li class="none">今週末は新雪の見込みがあるゲレンデがありません</li></ul>
+<ul class="picks"><li class="none">今週末に営業するゲレンデで、5cm以上の新雪の見込みはありません</li></ul>
 </div>
 </section>
 <section><h2>地域を選ぶ</h2><ul class="picks"><li><a href="r/hokkaido.html"><b>北海道</b><span class="sub">93か所</span></a></li><li><a href="r/tohoku.html"><b>東北</b><span class="sub">90か所</span></a></li><li><a href="r/kanto.html"><b>関東甲信越</b><span class="sub">143か所</span></a></li><li><a href="r/hokuriku.html"><b>北陸</b><span class="sub">17か所</span></a></li><li><a href="r/chukyo.html"><b>中京</b><span class="sub">16か所</span></a></li><li><a href="r/kansai.html"><b>関西</b><span class="sub">24か所</span></a></li><li><a href="r/west.html"><b>中国・四国・九州</b><span class="sub">29か所</span></a></li></ul></section><section><p class="note">去年までの2冬・全国99か所のアメダスで確かめた当たり具合（1冬目で係数を決めて2冬目で測り、その逆も平均）：20cm以上降った日を拾えた割合は1日前 56%・3日前 52%・7日前 40%、パウダーと出た日のうち外れた割合は1日前 37%・7日前 61%。8日目以降は51通りの予報のうち20cm以上になった割合で、確かめていない目安です。</p></section>
@@ -102,13 +104,15 @@ document.querySelectorAll('[data-tip]').forEach(el=>{
  el.addEventListener('click',()=>show(el));
  el.addEventListener('mouseleave',()=>tip.style.display='none');el.addEventListener('blur',()=>tip.style.display='none');});
 addEventListener('scroll',()=>tip.style.display='none',true);
-const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow');
+const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow'),ar=document.getElementById('area'),pb=document.querySelector('table.plan tbody');
 if(tb&&sel){const rows=[...tb.children];
  function apply(){const k=sel.value,only=pow.checked;
   const rs=rows.filter(r=>r.id).sort((a,b)=>k==='we'?b.dataset.we-a.dataset.we:k==='drive'?a.dataset.drive-b.dataset.drive:a.dataset.i-b.dataset.i);
   tb.replaceChildren(...(k==='i'?rows:rs));
-  rows.forEach(r=>{r.hidden=r.id?(only&&r.dataset.pow!=='1'):(k!=='i'||only)});}
- sel.addEventListener('change',apply);pow.addEventListener('change',apply);}
+  const a=ar.value;
+  rows.forEach(r=>{r.hidden=(a&&r.dataset.area!==a)||(r.id?(only&&r.dataset.pow!=='1'):(k!=='i'||only))});
+  if(pb)[...pb.children].forEach(r=>{r.hidden=!!a&&r.dataset.area!==a});}
+ sel.addEventListener('change',apply);pow.addEventListener('change',apply);ar.addEventListener('change',apply);}
 </script>
 </body>
 </html>

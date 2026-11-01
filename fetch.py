@@ -3,6 +3,7 @@ import datetime as dt
 import json
 import os
 import re
+import sys
 import time
 from statistics import median
 
@@ -55,16 +56,32 @@ def forecast(resorts):
     return {r["id"]: {"upper": j[2 * i]["hourly"], "lower": j[2 * i + 1]["hourly"]} for i, r in enumerate(resorts)}
 
 
-def ensemble(resorts):
-    """ECMWF のアンサンブル（51通り）を上部の標高で取り、日ごとの値だけ残す（1日1回。重いので前の分を使い回す）。
+ENS_PATH = "data/ens_daily.json"
+
+
+def ensemble(resorts, force=False):
+    """ECMWF のアンサンブル（51通り）を上部の標高で取り、日ごとの値だけ残す。
+    重いので毎朝4時に別の回で取り（python fetch.py ens）、ほかの回は前の分を使い回す。取れなければ3日前までの分を使う。
     {id: {date: {"sums": 51通りの夜の新雪 cm, "rain": 日中の雨の中央, "temp": 朝の気温の中央}}}"""
-    import build
-    path = "data/ens_daily.json"
-    if os.path.exists(path):
-        old = json.load(open(path, encoding="utf-8"))
-        made = dt.datetime.fromisoformat(old["made"])
-        if old.get("window") == 24 and dt.datetime.now(JST) - made < dt.timedelta(hours=20):  # 夜の区間を変えたら取り直す
+    old = None
+    if os.path.exists(ENS_PATH):
+        old = json.load(open(ENS_PATH, encoding="utf-8"))
+        if old.get("window") != 24:  # 夜の区間を変える前の分は使わない
+            old = None
+    age = dt.datetime.now(JST) - dt.datetime.fromisoformat(old["made"]) if old else None
+    if old and not force and age < dt.timedelta(hours=30):
+        return old["data"]
+    try:
+        return fetch_ensemble(resorts)
+    except Exception as e:
+        if old and age < dt.timedelta(days=3):
+            print(f"アンサンブルの取得に失敗。{old['made']} の分を使う: {e}", flush=True)
             return old["data"]
+        raise
+
+
+def fetch_ensemble(resorts):
+    import build
     j = chunked("https://ensemble-api.open-meteo.com/v1/ensemble",
                 [(r["lat"], r["lon"], elevations(r)["upper"]) for r in resorts],
                 dict(hourly="precipitation,temperature_2m", models="ecmwf_ifs025", forecast_days=15,
@@ -85,7 +102,7 @@ def ensemble(resorts):
                        "temp": round(median(n[-1]["temp"] for n, _ in w), 1)}
         out[r["id"]] = res
     json.dump({"made": dt.datetime.now(JST).isoformat(timespec="minutes"), "window": 24, "data": out},
-              open(path, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+              open(ENS_PATH, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     return out
 
 
@@ -144,6 +161,11 @@ def onemonth():
 
 def main():
     resorts = json.load(open("resorts.json", encoding="utf-8"))
+    if sys.argv[1:] == ["ens"]:  # 毎朝4時の回：アンサンブルだけ取る（決定論の予報と同じ1時間に重ねないため）
+        os.makedirs("data", exist_ok=True)
+        ensemble(resorts, force=True)
+        print("ens ok")
+        return
     now = dt.datetime.now(JST)
     data = {"fetched": now.isoformat(timespec="minutes"), "forecast": forecast(resorts)}
     for name, fn in (("ensemble", lambda: ensemble(resorts)),

@@ -128,8 +128,14 @@ def judge(lead, rain, gust, temp, prob, opened):
         return "bad", "雨"
     if gust is not None and gust >= 20 and lead <= 3:
         return "bad", "強風"
-    # verify2.py で決めた境目。8日目以降（51通りの割合）は確かめた一番先の7日目の境目を使う
-    thr = P["pthr"][str(min(LEADS, key=lambda x: (abs(x - lead), x)))]
+    if lead > 7:  # 8日目以降は確かめていないので、パウダーとは言わない（多い日は数字と確率で見る）
+        return "ok", "滑れる"
+    # verify2.py で決めた境目。4日目・6日目は前後の日の境目の平均
+    if str(lead) in P["pthr"]:
+        thr = P["pthr"][str(lead)]
+    else:
+        lo, hi = max(x for x in LEADS if x < lead), min(x for x in LEADS if x > lead)
+        thr = (P["pthr"][str(lo)] + P["pthr"][str(hi)]) / 2
     if prob is not None and prob >= thr and (temp is None or temp <= -2):
         return "powder", "パウダー"
     return "ok", "滑れる"
@@ -267,7 +273,13 @@ def weekend_picks(rows, days, n, prefix):
                    f'新雪{c["new"]}cm{conf}・20cm以上の確率 {round(c["prob"] * 100)}%</span></a></li>')
         if len(top) == n:
             break
-    return "".join(top) or '<li class="none">今週末は新雪の見込みがあるゲレンデがありません</li>'
+    if top:
+        return "".join(top)
+    if any(c and c["date"] in wk and c["lv"] != "closed" for row in rows for c in row["cells"]):
+        return '<li class="none">今週末に営業するゲレンデで、5cm以上の新雪の見込みはありません</li>'
+    soon = sorted((row["open"], row["r"]["name"], row["est"]) for row in rows if row["open"] and row["open"] > dt.date.fromisoformat(wk[-1] if wk else days[0].isoformat()))[:5]
+    return ('<li class="none">今週末に営業するゲレンデはまだありません。オープンが早いのは：'
+            + "、".join(f'{esc(n)} {d.month}/{d.day}{"ごろ" if e else ""}' for d, n, e in soon) + '</li>')
 
 
 def nav(prefix, current=None):
@@ -349,10 +361,10 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
                        else "営業中" + ("（推定）" if how else ""))
         drive = f'・東京から車{r["drive_h"]}時間' if r.get("drive_h") and r["drive_h"] <= 8 else ""
         if ri == 0 or r["area"] != rows[ri - 1]["r"]["area"]:
-            body.append(f'<tr class="area"><th class="name">{esc(r["area"])}</th><td colspan="{len(days)}"></td></tr>')
+            body.append(f'<tr class="area" data-area="{esc(r["area"])}"><th class="name">{esc(r["area"])}</th><td colspan="{len(days)}"></td></tr>')
         wk = [c["new"] for d, c in zip(days, row["cells"]) if c and d.weekday() >= 5 and c["lv"] in ("powder", "ok")][:2]
         pw = any(c and c["lv"] == "powder" and c["lead"] <= 7 for c in row["cells"])
-        body.append(f'<tr id="{r["id"]}" data-i="{ri}" data-we="{max(wk, default=-1)}" data-drive="{r.get("drive_h") or 99}" data-pow="{int(pw)}">'
+        body.append(f'<tr id="{r["id"]}" data-area="{esc(r["area"])}" data-i="{ri}" data-we="{max(wk, default=-1)}" data-drive="{r.get("drive_h") or 99}" data-pow="{int(pw)}">'
                     f'<th class="name"><a href="{esc(r["url"])}" target="_blank" rel="noopener">{esc(r["name"])}</a>'
                     f'<span class="sub">{opening}{drive}{"・" + esc(now_snow) if now_snow else ""}</span></th>{"".join(tds)}</tr>')
 
@@ -362,14 +374,17 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
     for i, row in enumerate(rows):
         r = row["r"]
         if i == 0 or r["area"] != rows[i - 1]["r"]["area"]:
-            pbody.append(f'<tr class="area"><th class="name">{esc(r["area"])}</th><td colspan="{len(weeks)}"></td></tr>')
+            pbody.append(f'<tr class="area" data-area="{esc(r["area"])}"><th class="name">{esc(r["area"])}</th><td colspan="{len(weeks)}"></td></tr>')
         tds = []
         for s in plan[r["id"]]:
             if not s:
                 tds.append('<td class="na">-</td>')
                 continue
-            tds.append(f'<td><b>{fmt_cm(s["median"])}</b><span class="sub">少 {fmt_cm(s["low"])}</span></td>')
-        pbody.append(f'<tr><th class="name">{esc(r["name"])}</th>{"".join(tds)}</tr>')
+            dep = f'・麓 {fmt_cm(s["depth"])}' if s["depth"] is not None else ""
+            tds.append(f'<td><b>{fmt_cm(s["median"])}</b><span class="sub">少 {fmt_cm(s["low"])}{dep}</span></td>')
+        st = (f'<span class="sub">麓＝{esc(r["amedas_name"])}（{r["amedas_alt"]}m・{r["amedas_km"]}km先）の積雪</span>'
+              if r.get("amedas_name") and any(s and s["depth"] is not None for s in plan[r["id"]]) else "")
+        pbody.append(f'<tr data-area="{esc(r["area"])}"><th class="name">{esc(r["name"])}{st}</th>{"".join(tds)}</tr>')
     om = []
     for area, v in onemonth.items():
         t = v.get("text", [])
@@ -377,7 +392,8 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
         om.append(f'<div class="om"><h3>{esc(area)}地方（{esc(issued)}発表）</h3><ul>'
                   + "".join(f"<li>{esc(x)}</li>" for x in t) + "</ul></div>")
 
-    return (fill(tpl, now, region, prefix, weekend, f"今週末のおすすめ（{region}）")
+    areas = "".join(f'<option>{esc(a)}</option>' for a in dict.fromkeys(row["r"]["area"] for row in rows))
+    return (fill(tpl, now, region, prefix, weekend, f"今週末のおすすめ（{region}）").replace("{{areas}}", areas)
             .replace("{{head}}", head).replace("{{body}}", "".join(body))
             .replace("{{whead}}", whead).replace("{{pbody}}", "".join(pbody)).replace("{{onemonth}}", "".join(om))
             .replace("{{accuracy}}", esc(accuracy())))
