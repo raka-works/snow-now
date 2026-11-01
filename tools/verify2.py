@@ -12,7 +12,7 @@ from collections import defaultdict
 import numpy as np
 
 MODELS = ["jma_msm", "jma_gsm", "ecmwf_ifs025", "gfs_seamless"]
-LEADS = [1, 2, 3, 5, 7]
+LEADS = [1, 2, 3, 4, 5, 6, 7]
 MAXLEAD = {"jma_msm": 2}  # MSM は3日先まで出ないので2日前まで
 REGIONS = ["北海道", "東北", "北陸・新潟", "関東甲信", "西日本・東海"]
 

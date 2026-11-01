@@ -142,15 +142,16 @@ if(typeof IDX!=='undefined'){
   const rs=IDX.filter(x=>norm(x.n+' '+x.p+' '+x.a).includes(t)).slice(0,30);
   hits.innerHTML=rs.length?rs.map(x=>'<li><button class="fav" data-id="'+x.id+'" aria-label="お気に入り">☆</button><a href="r/'+x.s+'.html#'+x.id+'"><b>'+esc(x.n)+'</b><span class="sub">'+esc(x.p+'・'+x.a+'・'+x.o)+'</span></a></li>').join(''):'<li class="none">見つかりません</li>';paintStars();});
 }
-const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow'),ar=document.getElementById('area'),pb=document.querySelector('table.plan tbody'),fo=document.getElementById('favonly');
+const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow'),ar=document.getElementById('area'),pb=document.querySelector('table.plan tbody'),fo=document.getElementById('favonly'),rq=document.getElementById('rq');
 if(tb&&sel){const rows=[...tb.children];
  function apply(){const k=sel.value,only=pow.checked;
   const rs=rows.filter(r=>r.id).sort((a,b)=>k==='we'?b.dataset.we-a.dataset.we:k==='drive'?a.dataset.drive-b.dataset.drive:a.dataset.i-b.dataset.i);
   tb.replaceChildren(...(k==='i'?rows:rs));
-  const a=ar.value,fv=fo.checked,F=favs();
-  rows.forEach(r=>{r.hidden=(a&&r.dataset.area!==a)||(r.id?((only&&r.dataset.pow!=='1')||(fv&&!F.includes(r.id))):(k!=='i'||only||fv))});
-  if(pb)[...pb.children].forEach(r=>{r.hidden=!!a&&r.dataset.area!==a});}
- sel.addEventListener('change',apply);pow.addEventListener('change',apply);ar.addEventListener('change',apply);fo.addEventListener('change',apply);window.applyRows=apply;}
+  const a=ar.value,fv=fo.checked,F=favs(),t=rq.value.trim().normalize('NFKC').toLowerCase();
+  const hit=r=>!t||r.querySelector('th').textContent.normalize('NFKC').toLowerCase().includes(t);
+  rows.forEach(r=>{r.hidden=(a&&r.dataset.area!==a)||(r.id?((only&&r.dataset.pow!=='1')||(fv&&!F.includes(r.id))||!hit(r)):(k!=='i'||only||fv||!!t))});
+  if(pb)[...pb.children].forEach(r=>{r.hidden=(!!a&&r.dataset.area!==a)||(r.dataset.id?((fv&&!F.includes(r.dataset.id))||!hit(r)):(fv||!!t))});}
+ sel.addEventListener('change',apply);pow.addEventListener('change',apply);ar.addEventListener('change',apply);fo.addEventListener('change',apply);rq.addEventListener('input',apply);window.applyRows=apply;}
 </script>
 </body>
 </html>

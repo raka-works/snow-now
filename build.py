@@ -14,7 +14,7 @@ Q = P["snow"]
 WEEK = "月火水木金土日"
 MODELS = list(P["tbias"])
 ECM = "ecmwf_ifs025"
-LEADS = sorted(int(k) for k in P["weight"])  # 確かめた先行日数（1・2・3・5・7日前）
+LEADS = sorted(int(k) for k in P["weight"])  # 確かめた先行日数（tools/verify2.py の LEADS）
 # ページの地域（resorts.json の region）と、ファイル名
 PAGES = [("北海道", "hokkaido"), ("東北", "tohoku"), ("関東甲信越", "kanto"), ("北陸", "hokuriku"),
          ("中京", "chukyo"), ("関西", "kansai"), ("中国・四国・九州", "west")]
@@ -175,6 +175,9 @@ def open_date(r, today):
     return None, None
 
 
+CLIM = {}  # data/clim.json（main で読む）
+
+
 def plan_stats(c, day):
     """過去10シーズンの、その日までの上部の累計降雪（11/1から）とふもとの積雪。clim.py の週ごとの値から一番近い週。"""
     if not c or not c.get("weeks"):
@@ -245,7 +248,8 @@ def main():
 
     start = today - dt.timedelta(days=today.weekday()) + dt.timedelta(days=7)
     weeks = [start + dt.timedelta(days=7 * w) for w in range(6)]
-    clim = json.load(open("data/clim.json", encoding="utf-8")) if os.path.exists("data/clim.json") else {}
+    global CLIM
+    clim = CLIM = json.load(open("data/clim.json", encoding="utf-8")) if os.path.exists("data/clim.json") else {}
     plan = {r["id"]: [plan_stats(clim.get(r["id"]), w + dt.timedelta(days=6)) for w in weeks] for r in resorts}
 
     onemonth = data.get("onemonth") or {}
@@ -307,7 +311,7 @@ def accuracy():
     pct = lambda x: f"{round(x * 100)}%" if x is not None else "－"
     return (f'去年までの2冬・全国{P["stations"]}か所のアメダスで確かめた当たり具合（1冬目で係数を決めて2冬目で測り、その逆も平均）：'
             f'20cm以上降った日を拾えた割合は1日前 {pct(v["1"]["pod"])}・3日前 {pct(v["3"]["pod"])}・7日前 {pct(v["7"]["pod"])}、'
-            f'20cm以上と出た日のうち外れた割合は1日前 {pct(v["1"]["far"])}・7日前 {pct(v["7"]["far"])}（降雪量だけで数えた値。表のパウダーはさらに朝の気温−2℃以下が条件）。4日前・6日前は近い日の係数を使っています。8日目以降は51通りの予報のうち20cm以上になった割合で、確かめていない目安です。')
+            f'20cm以上と出た日のうち外れた割合は1日前 {pct(v["1"]["far"])}・7日前 {pct(v["7"]["far"])}（降雪量だけで数えた値。表のパウダーはさらに朝の気温−2℃以下が条件）。{'' if 4 in LEADS and 6 in LEADS else '4日前・6日前は近い日の係数を使っています。'}8日目以降は51通りの予報のうち20cm以上になった割合で、確かめていない目安です。')
 
 
 def render_index(now, days, rows):
@@ -408,9 +412,10 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
                 continue
             dep = f'・麓 {fmt_cm(s["depth"])}' if s["depth"] is not None else ""
             tds.append(f'<td><b>{fmt_cm(s["median"])}</b><span class="sub">少 {fmt_cm(s["low"])}{dep}</span></td>')
-        st = (f'<span class="sub">麓＝{esc(r["amedas_name"])}（{r["amedas_alt"]}m・{r["amedas_km"]}km先）の積雪</span>'
-              if r.get("amedas_name") and any(s and s["depth"] is not None for s in plan[r["id"]]) else "")
-        pbody.append(f'<tr data-area="{esc(r["area"])}"><th class="name">{esc(r["name"])}{st}</th>{"".join(tds)}</tr>')
+        ds = (CLIM.get(r["id"]) or {}).get("depth_station")
+        st = (f'<span class="sub">麓＝{esc(ds["name"])}（{ds["alt"]}m・{ds["km"]}km先）の積雪</span>'
+              if ds and any(s and s["depth"] is not None for s in plan[r["id"]]) else "")
+        pbody.append(f'<tr data-area="{esc(r["area"])}" data-id="{r["id"]}"><th class="name">{esc(r["name"])}{st}</th>{"".join(tds)}</tr>')
     om = []
     for area, v in onemonth.items():
         t = v.get("text", [])

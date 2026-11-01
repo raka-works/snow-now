@@ -108,7 +108,7 @@ footer a{color:var(--muted)}
 <h2>2週間の新雪（ゲレンデ上部）</h2>
 <p class="lead">数字はその日の朝まで（前日9時〜当日9時）に積もる新雪の cm。4日先からは薄い色（7日先まで確かめた範囲だが外れやすい）。8日先からは51通りの予報の中央値で、確かめていない目安（パウダーの印は付けない。7日先までと計算が違うので、境目で数字がとぶことがあります）。マスを押すと詳しい値が出ます。</p>
 <div class="legend"><span><b style="color:var(--powder)">❄</b> パウダー</span><span>○ 滑れる</span><span><b style="color:var(--bad)">△</b> 雨・強風</span><span>－ 営業していない（オープン・終了日は発表か去年の日から推定）</span><span><i style="background:var(--bar)"></i>3日先まで</span><span><i style="background:var(--bar-far)"></i>4〜7日先</span><span><i style="border:1.5px dashed var(--bar-far)"></i>8日先から（目安）</span></div>
-<div class="tools"><label>エリア <select id="area"><option value="">すべて</option>{{areas}}</select></label><label>並べ替え <select id="sort"><option value="i">地域順</option><option value="we">今週末の新雪が多い順</option><option value="drive">東京から近い順</option></select></label><label><input type="checkbox" id="pow"> 7日以内にパウダーの見込みがある所だけ</label><label><input type="checkbox" id="favonly"> お気に入りだけ</label></div>
+<div class="tools"><input id="rq" type="search" placeholder="名前で絞る" autocomplete="off" style="font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--axis);background:var(--page);color:var(--ink)"><label>エリア <select id="area"><option value="">すべて</option>{{areas}}</select></label><label>並べ替え <select id="sort"><option value="i">地域順</option><option value="we">今週末の新雪が多い順</option><option value="drive">東京から近い順</option></select></label><label><input type="checkbox" id="pow"> 7日以内にパウダーの見込みがある所だけ</label><label><input type="checkbox" id="favonly"> お気に入りだけ</label></div>
 <div class="card scroll">
 <table class="grid"><thead><tr><th class="name"></th>{{head}}</tr></thead><tbody>{{body}}</tbody></table>
 </div>
@@ -162,15 +162,16 @@ if(typeof IDX!=='undefined'){
   const rs=IDX.filter(x=>norm(x.n+' '+x.p+' '+x.a).includes(t)).slice(0,30);
   hits.innerHTML=rs.length?rs.map(x=>'<li><button class="fav" data-id="'+x.id+'" aria-label="お気に入り">☆</button><a href="r/'+x.s+'.html#'+x.id+'"><b>'+esc(x.n)+'</b><span class="sub">'+esc(x.p+'・'+x.a+'・'+x.o)+'</span></a></li>').join(''):'<li class="none">見つかりません</li>';paintStars();});
 }
-const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow'),ar=document.getElementById('area'),pb=document.querySelector('table.plan tbody'),fo=document.getElementById('favonly');
+const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow'),ar=document.getElementById('area'),pb=document.querySelector('table.plan tbody'),fo=document.getElementById('favonly'),rq=document.getElementById('rq');
 if(tb&&sel){const rows=[...tb.children];
  function apply(){const k=sel.value,only=pow.checked;
   const rs=rows.filter(r=>r.id).sort((a,b)=>k==='we'?b.dataset.we-a.dataset.we:k==='drive'?a.dataset.drive-b.dataset.drive:a.dataset.i-b.dataset.i);
   tb.replaceChildren(...(k==='i'?rows:rs));
-  const a=ar.value,fv=fo.checked,F=favs();
-  rows.forEach(r=>{r.hidden=(a&&r.dataset.area!==a)||(r.id?((only&&r.dataset.pow!=='1')||(fv&&!F.includes(r.id))):(k!=='i'||only||fv))});
-  if(pb)[...pb.children].forEach(r=>{r.hidden=!!a&&r.dataset.area!==a});}
- sel.addEventListener('change',apply);pow.addEventListener('change',apply);ar.addEventListener('change',apply);fo.addEventListener('change',apply);window.applyRows=apply;}
+  const a=ar.value,fv=fo.checked,F=favs(),t=rq.value.trim().normalize('NFKC').toLowerCase();
+  const hit=r=>!t||r.querySelector('th').textContent.normalize('NFKC').toLowerCase().includes(t);
+  rows.forEach(r=>{r.hidden=(a&&r.dataset.area!==a)||(r.id?((only&&r.dataset.pow!=='1')||(fv&&!F.includes(r.id))||!hit(r)):(k!=='i'||only||fv||!!t))});
+  if(pb)[...pb.children].forEach(r=>{r.hidden=(!!a&&r.dataset.area!==a)||(r.dataset.id?((fv&&!F.includes(r.dataset.id))||!hit(r)):(fv||!!t))});}
+ sel.addEventListener('change',apply);pow.addEventListener('change',apply);ar.addEventListener('change',apply);fo.addEventListener('change',apply);rq.addEventListener('input',apply);window.applyRows=apply;}
 </script>
 </body>
 </html>
