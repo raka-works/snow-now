@@ -30,10 +30,12 @@ def chunked(url, locs, params, size, pause):
         part = locs[i:i + size]
         q = dict(params, latitude=",".join(str(x[0]) for x in part), longitude=",".join(str(x[1]) for x in part),
                  elevation=",".join(str(x[2]) for x in part))
-        for _ in range(8):
+        for _ in range(12):
             r = requests.get(url, params=q, headers=UA, timeout=180)
             if r.status_code in (429, 502, 503, 504):
-                print(r.status_code, "待機", r.text[:200], flush=True); time.sleep(65); continue
+                # 1時間の枠を使い切ったときは長めに待つ（Actions の時間内に収まる範囲で）
+                wait = 300 if "Hourly" in r.text else 65
+                print(r.status_code, f"{wait}秒待機", r.text[:200], flush=True); time.sleep(wait); continue
             break
         if r.status_code != 200:
             raise RuntimeError(f"{url} {i}地点目から: {r.status_code} {r.text[:300]}")
@@ -128,8 +130,15 @@ def onemonth():
         if not name:
             continue
         x = get(u).content.decode("utf-8")
-        out[name] = {"url": u, "issued": re.search(r"<ReportDateTime>([^<]+)", x).group(1),
-                     "text": re.findall(r"<jmx_eb:Text[^>]*>([^<]+)</jmx_eb:Text>", x)}
+        text = []
+        g = [t.strip() for t in re.findall(r"<jmx_eb:GeneralSituationText[^>]*>([^<]+)<", x)]
+        if g:
+            text.append("天気：" + " ".join(g))
+        for kind, body in re.findall(r'<jmx_eb:SignificantClimateElement kind="([^"]+)">(.*?)</jmx_eb:SignificantClimateElement>', x, re.S):
+            ts = [t.strip() for t in re.findall(r"<jmx_eb:Text[^>]*>([^<]+)<", body)]
+            if ts:
+                text.append(f"{kind}（{'1か月' if len(ts) == 1 else '週ごと'}）：" + " ".join(ts))
+        out[name] = {"url": u, "issued": re.search(r"<ReportDateTime>([^<]+)", x).group(1), "text": text}
     return out
 
 

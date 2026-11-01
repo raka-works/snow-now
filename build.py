@@ -2,6 +2,7 @@
 import datetime as dt
 import html
 import json
+from collections import defaultdict
 import math
 import os
 import sys
@@ -134,17 +135,26 @@ def judge(lead, rain, gust, temp, prob, opened):
     return "ok", "滑れる"
 
 
+def to_season(d, today):
+    """日付を今シーズン（7月〜翌6月）の同じ月日に置き換える。"""
+    season = today.year if today.month >= 7 else today.year - 1  # 今シーズンが始まった年
+    y = season + (1 if d.month < 7 else 0)
+    return dt.date(y, d.month, min(d.day, 28) if d.month == 2 else d.day)
+
+
 def open_date(r, today):
-    """(オープン日, 推定か)。未発表なら去年のオープン日を今シーズンの同じ日に置き換える。どちらもなければ (None, False)。"""
+    """(オープン日, 推定の種類)。今シーズンの発表がなければ去年のオープン日を今シーズンに置き換える（"last"）。
+    どちらもなければ (None, None)。main で同じ地域の推定日の中央を入れる（"area"）。"""
+    start = to_season(dt.date(2000, 7, 1), today)
     if r.get("open"):
-        return dt.date.fromisoformat(r["open"]), False
+        d = dt.date.fromisoformat(r["open"])
+        if d >= start:
+            return d, None
+        return to_season(d, today), "last"  # 去年のシーズンの発表が残っている
     if r.get("open_last"):
         yy, mm, dd = r["open_last"].split("/")
-        last = dt.date(int(yy), int(mm), {"上旬": 5, "中旬": 15, "下旬": 25}.get(dd) or int(dd))
-        season = today.year if today.month >= 7 else today.year - 1  # 今シーズンが始まった年
-        y = season + (1 if last.month < 7 else 0)
-        return dt.date(y, last.month, min(last.day, 28) if last.month == 2 else last.day), True
-    return None, False
+        return to_season(dt.date(int(yy), int(mm), {"上旬": 5, "中旬": 15, "下旬": 25}.get(dd) or int(dd)), today), "last"
+    return None, None
 
 
 def plan_stats(c, day):
@@ -168,6 +178,14 @@ def main():
     today = now.date() if now.hour < 9 else now.date() + dt.timedelta(days=1)
     days = [today + dt.timedelta(days=i) for i in range(14)]
     ens_all = data.get("ensemble") or {}
+    opens = {r["id"]: open_date(r, today) for r in resorts}
+    by_area = defaultdict(list)
+    for r in resorts:
+        if opens[r["id"]][0]:
+            by_area[r["area"]].append(opens[r["id"]][0])
+    for r in resorts:  # オープン日がまったく分からなければ、同じ地域のゲレンデの真ん中の日
+        if not opens[r["id"]][0] and by_area[r["area"]]:
+            opens[r["id"]] = (sorted(by_area[r["area"]])[len(by_area[r["area"]]) // 2], "area")
     rows = []
     for r in resorts:
         f = data["forecast"].get(r["id"])
@@ -176,7 +194,7 @@ def main():
         scale = P["scale"][fit_region(r)]
         up, low = per_model(f["upper"], scale), per_model(f["lower"], scale)
         ens = ens_all.get(r["id"]) or {}  # fetch.py が日ごとにまとめた51通り
-        opened_date, est = open_date(r, today)
+        opened_date, est = opens[r["id"]]
         cells = []
         for d in days:
             lead = (d - today).days
@@ -197,7 +215,7 @@ def main():
             if len(sums) >= 20:
                 lo, hi = sums[int(len(sums) * 0.1)], sums[int(len(sums) * 0.9)]
             bl = blend_day(low, d, max(lead, 1))
-            opened = None if opened_date is None else d >= opened_date
+            opened = False if opened_date is None else d >= opened_date
             lv, label = judge(lead, rain, gust, temp, prob, opened)
             cells.append({"date": d.isoformat(), "new": round(new), "lo": None if lo is None else round(lo),
                           "hi": None if hi is None else round(hi), "prob": round(prob, 2), "src": src,
@@ -233,7 +251,7 @@ def weekend_picks(rows, days, n, prefix):
     picks = []
     for row in rows:
         for c in row["cells"]:
-            if c and c["date"] in wk and c["lv"] in ("powder", "ok") and c["new"] >= 5:
+            if c and c["date"] in wk and c["lv"] in ("powder", "ok") and c["new"] >= 5 and row["est"] != "area":
                 picks.append((c["new"] + (30 if c["lv"] == "powder" else 0) - c["rain"] * 5, row, c))
     picks.sort(key=lambda x: -x[0])
     top, seen = [], set()
@@ -307,7 +325,7 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
                 tds.append(f'<td class="na{we}"></td>')
                 continue
             h = max(2, round(c["new"] / maxv * 30)) if c["new"] > 0 else 0
-            far = " far" if c["lead"] > 3 else ""
+            far = " far" if c["lead"] >= 4 else ""
             tip = (f'{r["name"]}（上部{round(r["base"] + (r["top"] - r["base"]) * 0.75)}m） {d.month}/{d.day}({WEEK[d.weekday()]}) 朝までの新雪 {c["new"]}cm'
                    + (f'（幅 {c["lo"]}〜{c["hi"]}cm）' if c["lo"] is not None else "")
                    + f' / 20cm以上の確率 {round(c["prob"] * 100)}%' + ("（目安）" if c["src"] == "ens" else "")
@@ -325,11 +343,11 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
         od = row["open"]
         if od is None:
             opening = "オープン日不明"
-        elif od > now.date():
-            opening = f'{od.month}/{od.day}ごろ〜（去年から推定）' if row["est"] else f'{od.month}/{od.day}〜'
         else:
-            opening = "営業中" + ("（推定）" if row["est"] else "")
-        drive = f'・東京から車{r["drive_h"]}時間' if r.get("drive_h") else ""
+            how = {"last": "（去年の日から推定）", "area": "（周りのゲレンデから推定）"}.get(row["est"], "")
+            opening = (f'{od.month}/{od.day}{"ごろ" if how else ""}〜{how}' if od > now.date()
+                       else "営業中" + ("（推定）" if how else ""))
+        drive = f'・東京から車{r["drive_h"]}時間' if r.get("drive_h") and r["drive_h"] <= 8 else ""
         if ri == 0 or r["area"] != rows[ri - 1]["r"]["area"]:
             body.append(f'<tr class="area"><th class="name">{esc(r["area"])}</th><td colspan="{len(days)}"></td></tr>')
         wk = [c["new"] for d, c in zip(days, row["cells"]) if c and d.weekday() >= 5 and c["lv"] in ("powder", "ok")][:2]
