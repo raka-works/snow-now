@@ -123,7 +123,7 @@ def ens_members(h, scale):
 
 def judge(lead, rain, gust, temp, prob, opened):
     if opened is False:
-        return "closed", "営業前"
+        return "closed", "営業していない"
     if rain >= 1.0:
         return "bad", "雨"
     if gust is not None and gust >= 20 and lead <= 3:
@@ -148,6 +148,19 @@ def to_season(d, today):
     return dt.date(y, d.month, min(d.day, 28) if d.month == 2 else d.day)
 
 
+def parse_ymd(s):
+    yy, mm, dd = s.split("/")
+    return dt.date(int(yy), int(mm), {"上旬": 5, "中旬": 15, "下旬": 25}.get(dd) or int(dd))
+
+
+def close_date(r, today):
+    """去年の営業終了日を今シーズンに置き換えた推定。分からなければ None。"""
+    try:
+        return to_season(parse_ymd(r["close_last"]), today) if r.get("close_last") else None
+    except ValueError:
+        return None
+
+
 def open_date(r, today):
     """(オープン日, 推定の種類)。今シーズンの発表がなければ去年のオープン日を今シーズンに置き換える（"last"）。
     どちらもなければ (None, None)。main で同じ地域の推定日の中央を入れる（"area"）。"""
@@ -158,8 +171,7 @@ def open_date(r, today):
             return d, None
         return to_season(d, today), "last"  # 去年のシーズンの発表が残っている
     if r.get("open_last"):
-        yy, mm, dd = r["open_last"].split("/")
-        return to_season(dt.date(int(yy), int(mm), {"上旬": 5, "中旬": 15, "下旬": 25}.get(dd) or int(dd)), today), "last"
+        return to_season(parse_ymd(r["open_last"]), today), "last"
     return None, None
 
 
@@ -201,6 +213,7 @@ def main():
         up, low = per_model(f["upper"], scale), per_model(f["lower"], scale)
         ens = ens_all.get(r["id"]) or {}  # fetch.py が日ごとにまとめた51通り
         opened_date, est = opens[r["id"]]
+        closing = close_date(r, today)
         cells = []
         for d in days:
             lead = max((d - now.date()).days, 1)  # 予報を取った日から数える（検証の「L日前の予報」と同じ）
@@ -221,14 +234,14 @@ def main():
             if src == "ens":  # 幅は51通りの中央値を出す日だけ（7日先までは中心が別の計算なので出さない）
                 lo, hi = sums[int(len(sums) * 0.1)], sums[int(len(sums) * 0.9)]
             bl = blend_day(low, d, lead)
-            opened = False if opened_date is None else d >= opened_date
+            opened = False if opened_date is None or (closing and d > closing) else d >= opened_date
             lv, label = judge(lead, rain, gust, temp, prob, opened)
             cells.append({"date": d.isoformat(), "new": round(new), "lo": None if lo is None else round(lo),
                           "hi": None if hi is None else round(hi), "prob": round(prob, 2), "src": src,
                           "rain": round(rain, 1), "temp": round(temp, 1), "low_rain": round(bl["rain"], 1) if bl else None,
                           "lv": lv, "label": label, "gust": round(gust) if gust is not None else None, "lead": lead})
         am = (data.get("amedas") or {}).get(r["amedas"] or "", {})
-        rows.append({"r": r, "cells": cells, "amedas": am, "open": opened_date, "est": est})
+        rows.append({"r": r, "cells": cells, "amedas": am, "open": opened_date, "est": est, "close": closing})
 
     start = today - dt.timedelta(days=today.weekday()) + dt.timedelta(days=7)
     weeks = [start + dt.timedelta(days=7 * w) for w in range(6)]
@@ -294,7 +307,7 @@ def accuracy():
     pct = lambda x: f"{round(x * 100)}%" if x is not None else "－"
     return (f'去年までの2冬・全国{P["stations"]}か所のアメダスで確かめた当たり具合（1冬目で係数を決めて2冬目で測り、その逆も平均）：'
             f'20cm以上降った日を拾えた割合は1日前 {pct(v["1"]["pod"])}・3日前 {pct(v["3"]["pod"])}・7日前 {pct(v["7"]["pod"])}、'
-            f'20cm以上と出た日のうち外れた割合は1日前 {pct(v["1"]["far"])}・7日前 {pct(v["7"]["far"])}（降雪量だけで数えた値。表のパウダーはさらに朝の気温−2℃以下が条件）。4日前・6日前は前後の日の係数を使っています。8日目以降は51通りの予報のうち20cm以上になった割合で、確かめていない目安です。')
+            f'20cm以上と出た日のうち外れた割合は1日前 {pct(v["1"]["far"])}・7日前 {pct(v["7"]["far"])}（降雪量だけで数えた値。表のパウダーはさらに朝の気温−2℃以下が条件）。4日前・6日前は近い日の係数を使っています。8日目以降は51通りの予報のうち20cm以上になった割合で、確かめていない目安です。')
 
 
 def render_index(now, days, rows):
@@ -358,8 +371,10 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
             opening = "オープン日不明"
         else:
             how = {"last": "（去年の日から推定）", "area": "（周りのゲレンデから推定）"}.get(row["est"], "")
+            cl = row["close"]
             opening = (f'{od.month}/{od.day}{"ごろ" if how else ""}〜{how}' if od > now.date()
-                       else "営業中" + ("（推定）" if how else ""))
+                       else "営業終了（去年の日から推定）" if cl and now.date() > cl
+                       else "営業中" + ("（推定）" if how else "") + (f'・{cl.month}/{cl.day}ごろまで' if cl and (cl - now.date()).days <= 30 else ""))
         drive = f'・東京から車{r["drive_h"]}時間' if r.get("drive_h") and r["drive_h"] <= 8 else ""
         if ri == 0 or r["area"] != rows[ri - 1]["r"]["area"]:
             body.append(f'<tr class="area" data-area="{esc(r["area"])}"><th class="name">{esc(r["area"])}</th><td colspan="{len(days)}"></td></tr>')

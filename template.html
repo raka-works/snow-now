@@ -92,8 +92,8 @@ footer a{color:var(--muted)}
 <!--grid-->
 <section>
 <h2>2週間の新雪（ゲレンデ上部）</h2>
-<p class="lead">数字はその日の朝まで（前日9時〜当日9時）に積もる新雪の cm。4日先からは薄い色（7日先まで確かめた範囲だが外れやすい）。8日先からは51通りの予報の中央値で、確かめていない目安（パウダーの印は付けない）。マスを押すと詳しい値が出ます。</p>
-<div class="legend"><span><b style="color:var(--powder)">❄</b> パウダー</span><span>○ 滑れる</span><span><b style="color:var(--bad)">△</b> 雨・強風</span><span>－ 営業前（オープン日は発表か推定）</span><span><i style="background:var(--bar)"></i>3日先まで</span><span><i style="background:var(--bar-far)"></i>4〜7日先</span><span><i style="border:1.5px dashed var(--bar-far)"></i>8日先から（目安）</span></div>
+<p class="lead">数字はその日の朝まで（前日9時〜当日9時）に積もる新雪の cm。4日先からは薄い色（7日先まで確かめた範囲だが外れやすい）。8日先からは51通りの予報の中央値で、確かめていない目安（パウダーの印は付けない。7日先までと計算が違うので、境目で数字がとぶことがあります）。マスを押すと詳しい値が出ます。</p>
+<div class="legend"><span><b style="color:var(--powder)">❄</b> パウダー</span><span>○ 滑れる</span><span><b style="color:var(--bad)">△</b> 雨・強風</span><span>－ 営業していない（オープン・終了日は発表か去年の日から推定）</span><span><i style="background:var(--bar)"></i>3日先まで</span><span><i style="background:var(--bar-far)"></i>4〜7日先</span><span><i style="border:1.5px dashed var(--bar-far)"></i>8日先から（目安）</span></div>
 <div class="tools"><label>エリア <select id="area"><option value="">すべて</option>{{areas}}</select></label><label>並べ替え <select id="sort"><option value="i">地域順</option><option value="we">今週末の新雪が多い順</option><option value="drive">東京から近い順</option></select></label><label><input type="checkbox" id="pow"> 7日以内にパウダーの見込みがある所だけ</label></div>
 <div class="card scroll">
 <table class="grid"><thead><tr><th class="name"></th>{{head}}</tr></thead><tbody>{{body}}</tbody></table>

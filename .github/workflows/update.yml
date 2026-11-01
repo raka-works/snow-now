@@ -31,7 +31,9 @@ jobs:
           restore-keys: ens-
       - name: アンサンブルだけ取る（4時の回）
         if: github.event.schedule == '0 19 * * *'
-        run: python -u fetch.py ens
+        run: |
+          set -o pipefail
+          python -u fetch.py ens 2>&1 | tee data/fetch_log.txt
       - name: 予報と観測を取得
         if: github.event.schedule != '0 19 * * *'
         run: |
