@@ -53,6 +53,7 @@ jobs:
           git config user.email "raka-works@users.noreply.github.com"
           git rm -q --cached --ignore-unmatch data/fetch_log.txt; git rm -q --cached --ignore-unmatch data/summary.json; git add index.html r data/notified.json data/onemonth.json
           git diff --cached --quiet || git commit -m "update $(date -u +%FT%H:%MZ)"
+          git pull --rebase -X theirs -q || true
           git push
       - name: 失敗したら取得のログを残す（Actions のログは外から読めないため）
         if: failure()

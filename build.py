@@ -203,8 +203,8 @@ def main():
         opened_date, est = opens[r["id"]]
         cells = []
         for d in days:
-            lead = (d - today).days
-            b = blend_day(up, d, max(lead, 1))
+            lead = max((d - now.date()).days, 1)  # 予報を取った日から数える（検証の「L日前の予報」と同じ）
+            b = blend_day(up, d, lead)
             e = ens.get(d.isoformat())
             sums = e["sums"] if e else []
             if lead <= 7 and b:
@@ -218,9 +218,9 @@ def main():
                 cells.append(None)
                 continue
             lo = hi = None
-            if len(sums) >= 20:
+            if src == "ens":  # 幅は51通りの中央値を出す日だけ（7日先までは中心が別の計算なので出さない）
                 lo, hi = sums[int(len(sums) * 0.1)], sums[int(len(sums) * 0.9)]
-            bl = blend_day(low, d, max(lead, 1))
+            bl = blend_day(low, d, lead)
             opened = False if opened_date is None else d >= opened_date
             lv, label = judge(lead, rain, gust, temp, prob, opened)
             cells.append({"date": d.isoformat(), "new": round(new), "lo": None if lo is None else round(lo),
@@ -253,7 +253,8 @@ ONEMONTH_FOR = {"北海道": ("北海道",), "東北": ("東北",), "関東甲�
 
 
 def weekend_picks(rows, days, n, prefix):
-    wk = [d.isoformat() for d in days if d.weekday() >= 5][:2]
+    first = next((d for d in days if d.weekday() >= 5), None)  # 次の土日（日曜なら日曜だけ）
+    wk = [x.isoformat() for x in days if first and 0 <= (x - first).days <= (1 if first.weekday() == 5 else 0)]
     picks = []
     for row in rows:
         for c in row["cells"]:
@@ -293,7 +294,7 @@ def accuracy():
     pct = lambda x: f"{round(x * 100)}%" if x is not None else "－"
     return (f'去年までの2冬・全国{P["stations"]}か所のアメダスで確かめた当たり具合（1冬目で係数を決めて2冬目で測り、その逆も平均）：'
             f'20cm以上降った日を拾えた割合は1日前 {pct(v["1"]["pod"])}・3日前 {pct(v["3"]["pod"])}・7日前 {pct(v["7"]["pod"])}、'
-            f'パウダーと出た日のうち外れた割合は1日前 {pct(v["1"]["far"])}・7日前 {pct(v["7"]["far"])}。8日目以降は51通りの予報のうち20cm以上になった割合で、確かめていない目安です。')
+            f'20cm以上と出た日のうち外れた割合は1日前 {pct(v["1"]["far"])}・7日前 {pct(v["7"]["far"])}（降雪量だけで数えた値。表のパウダーはさらに朝の気温−2℃以下が条件）。4日前・6日前は前後の日の係数を使っています。8日目以降は51通りの予報のうち20cm以上になった割合で、確かめていない目安です。')
 
 
 def render_index(now, days, rows):
@@ -337,7 +338,7 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
                 tds.append(f'<td class="na{we}"></td>')
                 continue
             h = max(2, round(c["new"] / maxv * 30)) if c["new"] > 0 else 0
-            far = " far" if c["lead"] >= 4 else ""
+            far = " ens" if c["src"] == "ens" else " far" if c["lead"] >= 4 else ""
             tip = (f'{r["name"]}（上部{round(r["base"] + (r["top"] - r["base"]) * 0.75)}m） {d.month}/{d.day}({WEEK[d.weekday()]}) 朝までの新雪 {c["new"]}cm'
                    + (f'（幅 {c["lo"]}〜{c["hi"]}cm）' if c["lo"] is not None else "")
                    + f' / 20cm以上の確率 {round(c["prob"] * 100)}%' + ("（目安）" if c["src"] == "ens" else "")
