@@ -15,7 +15,7 @@ concurrency: update
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,7 +29,9 @@ jobs:
           key: ens-${{ github.run_id }}
           restore-keys: ens-
       - name: 予報と観測を取得
-        run: python fetch.py
+        run: |
+          set -o pipefail
+          python -u fetch.py 2>&1 | tee data/fetch_log.txt
       - name: ページを作る
         run: python build.py
       - name: パウダーなら通知
@@ -40,6 +42,13 @@ jobs:
         run: |
           git config user.name "raka-works"
           git config user.email "raka-works@users.noreply.github.com"
-          git add index.html r data/summary.json data/notified.json data/onemonth.json
+          git rm -q --cached --ignore-unmatch data/fetch_log.txt; git add index.html r data/summary.json data/notified.json data/onemonth.json
           git diff --cached --quiet || git commit -m "update $(date -u +%FT%H:%MZ)"
           git push
+      - name: 失敗したら取得のログを残す（Actions のログは外から読めないため）
+        if: failure()
+        run: |
+          git config user.name "raka-works"
+          git config user.email "raka-works@users.noreply.github.com"
+          git add -f data/fetch_log.txt
+          git commit -m "fetch failed $(date -u +%FT%H:%MZ)" && git push

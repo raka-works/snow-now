@@ -10,3 +10,4 @@ tools/cache/
 tools/*.log
 tools/*.err
 __pycache__/
+data/fetch_log.txt

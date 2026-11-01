@@ -30,11 +30,13 @@ def chunked(url, locs, params, size, pause):
         part = locs[i:i + size]
         q = dict(params, latitude=",".join(str(x[0]) for x in part), longitude=",".join(str(x[1]) for x in part),
                  elevation=",".join(str(x[2]) for x in part))
-        for _ in range(6):
+        for _ in range(8):
             r = requests.get(url, params=q, headers=UA, timeout=180)
-            if r.status_code == 429:
-                print("429 待機", r.text[:100], flush=True); time.sleep(65); continue
-            r.raise_for_status(); break
+            if r.status_code in (429, 502, 503, 504):
+                print(r.status_code, "待機", r.text[:200], flush=True); time.sleep(65); continue
+            break
+        if r.status_code != 200:
+            raise RuntimeError(f"{url} {i}地点目から: {r.status_code} {r.text[:300]}")
         j = r.json()
         out += j if isinstance(j, list) else [j]
         if i + size < len(locs):
