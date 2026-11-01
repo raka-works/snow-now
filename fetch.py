@@ -32,14 +32,17 @@ def chunked(url, locs, params, size, pause):
         q = dict(params, latitude=",".join(str(x[0]) for x in part), longitude=",".join(str(x[1]) for x in part),
                  elevation=",".join(str(x[2]) for x in part))
         for _ in range(12):
-            r = requests.get(url, params=q, headers=UA, timeout=180)
+            try:
+                r = requests.get(url, params=q, headers=UA, timeout=240)
+            except (requests.Timeout, requests.ConnectionError) as e:  # Actions からは時間切れになることがある
+                print("時間切れ・接続エラー、取り直す", e, flush=True); time.sleep(30); r = None; continue
             if r.status_code in (429, 502, 503, 504):
                 # 1時間の枠を使い切ったときは長めに待つ（Actions の時間内に収まる範囲で）
                 wait = 300 if "Hourly" in r.text else 65
                 print(r.status_code, f"{wait}秒待機", r.text[:200], flush=True); time.sleep(wait); continue
             break
-        if r.status_code != 200:
-            raise RuntimeError(f"{url} {i}地点目から: {r.status_code} {r.text[:300]}")
+        if r is None or r.status_code != 200:
+            raise RuntimeError(f"{url} {i}地点目から: {'時間切れ' if r is None else str(r.status_code) + ' ' + r.text[:300]}")
         j = r.json()
         out += j if isinstance(j, list) else [j]
         if i + size < len(locs):
@@ -52,7 +55,7 @@ def forecast(resorts):
     locs = [(r["lat"], r["lon"], e) for r in resorts for e in elevations(r).values()]
     j = chunked("https://api.open-meteo.com/v1/forecast", locs, dict(
         hourly="precipitation,temperature_2m,wind_gusts_10m", models=",".join(DET_MODELS),
-        forecast_days=9, timezone="Asia/Tokyo"), 100, 20)  # 8日目以降はアンサンブルを使うので9日分で足りる（枠の節約）
+        forecast_days=9, timezone="Asia/Tokyo"), 50, 10)  # 8日目以降はアンサンブルを使うので9日分で足りる（枠の節約）
     return {r["id"]: {"upper": j[2 * i]["hourly"], "lower": j[2 * i + 1]["hourly"]} for i, r in enumerate(resorts)}
 
 
