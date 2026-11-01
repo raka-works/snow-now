@@ -1,0 +1,108 @@
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/connectionpool.py", line 470, in _make_request
+    self._validate_conn(conn)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/connectionpool.py", line 1125, in _validate_conn
+    conn.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/connection.py", line 878, in connect
+    wrapped_socket, is_verified = _ssl_wrap_socket_and_match_hostname(
+                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sock=sock,
+        ^^^^^^^^^^
+    ...<14 lines>...
+        assert_fingerprint=self.assert_fingerprint,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/connection.py", line 1080, in _ssl_wrap_socket_and_match_hostname
+    ssl_sock = ssl_wrap_socket(
+        sock=sock,
+    ...<8 lines>...
+        tls_in_tls=tls_in_tls,
+    )
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/util/ssl_.py", line 437, in ssl_wrap_socket
+    ssl_sock = _ssl_wrap_socket_impl(sock, context, tls_in_tls, server_hostname)
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/util/ssl_.py", line 481, in _ssl_wrap_socket_impl
+    return ssl_context.wrap_socket(sock, server_hostname=server_hostname)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/ssl.py", line 469, in wrap_socket
+    return self.sslsocket_class._create(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sock=sock,
+        ^^^^^^^^^^
+    ...<5 lines>...
+        session=session
+        ^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/ssl.py", line 1087, in _create
+    self.do_handshake()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/ssl.py", line 1383, in do_handshake
+    self._sslobj.do_handshake()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+TimeoutError: _ssl.c:1015: The handshake operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/requests/adapters.py", line 696, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/connectionpool.py", line 847, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/util/retry.py", line 510, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/util/util.py", line 39, in reraise
+    raise value
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/connectionpool.py", line 793, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/connectionpool.py", line 494, in _make_request
+    raise new_e
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/connectionpool.py", line 472, in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=conn.timeout)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/urllib3/connectionpool.py", line 373, in _raise_timeout
+    raise ReadTimeoutError(
+        self, url, f"Read timed out. (read timeout={timeout_value})"
+    ) from err
+urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=180)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/snow-now/snow-now/fetch.py", line 190, in <module>
+    main()
+    ~~~~^^
+  File "/home/runner/work/snow-now/snow-now/fetch.py", line 170, in main
+    data = {"fetched": now.isoformat(timespec="minutes"), "forecast": forecast(resorts)}
+                                                                      ~~~~~~~~^^^^^^^^^
+  File "/home/runner/work/snow-now/snow-now/fetch.py", line 53, in forecast
+    j = chunked("https://api.open-meteo.com/v1/forecast", locs, dict(
+        hourly="precipitation,temperature_2m,wind_gusts_10m", models=",".join(DET_MODELS),
+        forecast_days=16, timezone="Asia/Tokyo"), 100, 20)
+  File "/home/runner/work/snow-now/snow-now/fetch.py", line 35, in chunked
+    r = requests.get(url, params=q, headers=UA, timeout=180)
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/requests/api.py", line 87, in get
+    return request("get", url, params=params, **kwargs)
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/requests/api.py", line 71, in request
+    return session.request(method=method, url=url, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+  File "/opt/hostedtoolcache/Python/3.13.17/x64/lib/python3.13/site-packages/requests/adapters.py", line 742, in send
+    raise ReadTimeout(e, request=request)
+requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=180)
