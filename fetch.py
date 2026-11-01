@@ -61,7 +61,7 @@ def ensemble(resorts):
     if os.path.exists(path):
         old = json.load(open(path, encoding="utf-8"))
         made = dt.datetime.fromisoformat(old["made"])
-        if dt.datetime.now(JST) - made < dt.timedelta(hours=20):
+        if old.get("window") == 24 and dt.datetime.now(JST) - made < dt.timedelta(hours=20):  # 夜の区間を変えたら取り直す
             return old["data"]
     j = chunked("https://ensemble-api.open-meteo.com/v1/ensemble",
                 [(r["lat"], r["lon"], elevations(r)["upper"]) for r in resorts],
@@ -75,14 +75,14 @@ def ensemble(resorts):
         for ds in days:
             d = dt.date.fromisoformat(ds)
             w = [build.windows(m, d) for m in ms]
-            w = [(n, dy) for n, dy in w if len(n) >= 12]
+            w = [(n, dy) for n, dy in w if len(n) >= 20]
             if len(w) < 20:
                 continue
             res[ds] = {"sums": sorted(round(sum(h["snow"] for h in n), 1) for n, _ in w),
                        "rain": round(median(sum(h["rain"] for h in dy) for _, dy in w), 1),
                        "temp": round(median(n[-1]["temp"] for n, _ in w), 1)}
         out[r["id"]] = res
-    json.dump({"made": dt.datetime.now(JST).isoformat(timespec="minutes"), "data": out},
+    json.dump({"made": dt.datetime.now(JST).isoformat(timespec="minutes"), "window": 24, "data": out},
               open(path, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     return out
 

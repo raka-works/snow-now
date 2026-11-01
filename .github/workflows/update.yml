@@ -35,6 +35,7 @@ jobs:
       - name: ページを作る
         run: python build.py
       - name: パウダーなら通知
+        continue-on-error: true  # 通知が失敗してもページは保存する
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: python notify.py

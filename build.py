@@ -78,9 +78,9 @@ def prob20(b, lead):
 
 
 def windows(hours, day):
-    """その日の朝までの新雪（前日15時〜当日9時）と、日中（9〜16時）の様子。"""
+    """その日の朝までの新雪（前日9時〜当日9時の24時間。係数を決めた検証の日降雪と同じ長さ）と、日中（9〜16時）の様子。"""
     d0 = dt.datetime.combine(day, dt.time(9))
-    night = [x for x in hours if d0 - dt.timedelta(hours=18) < dt.datetime.fromisoformat(x["time"]) <= d0]
+    night = [x for x in hours if d0 - dt.timedelta(hours=24) < dt.datetime.fromisoformat(x["time"]) <= d0]
     daytime = [x for x in hours if d0 < dt.datetime.fromisoformat(x["time"]) <= d0 + dt.timedelta(hours=7)]
     return night, daytime
 
@@ -92,7 +92,7 @@ def blend_day(models, d, lead):
     temps, gusts = [], []
     for m, hrs in models.items():
         night, daytime = windows(hrs, d)
-        if len(night) < 12 or not w.get(m):
+        if len(night) < 20 or not w.get(m):
             continue
         num += w[m] * sum(x["snow"] for x in night)
         rain += w[m] * sum(x["rain"] for x in daytime)
@@ -127,11 +127,24 @@ def judge(lead, rain, gust, temp, prob, opened):
         return "bad", "雨"
     if gust is not None and gust >= 20 and lead <= 3:
         return "bad", "強風"
-    # 7日先までは verify2.py で決めた境目、8日目以降（51通りの割合）は半分以上
-    thr = P["pthr"][str(min(LEADS, key=lambda x: (abs(x - lead), x)))] if lead <= 7 else 0.5
+    # verify2.py で決めた境目。8日目以降（51通りの割合）は確かめた一番先の7日目の境目を使う
+    thr = P["pthr"][str(min(LEADS, key=lambda x: (abs(x - lead), x)))]
     if prob is not None and prob >= thr and (temp is None or temp <= -2):
         return "powder", "パウダー"
     return "ok", "滑れる"
+
+
+def open_date(r, today):
+    """(オープン日, 推定か)。未発表なら去年のオープン日を今シーズンの同じ日に置き換える。どちらもなければ (None, False)。"""
+    if r.get("open"):
+        return dt.date.fromisoformat(r["open"]), False
+    if r.get("open_last"):
+        yy, mm, dd = r["open_last"].split("/")
+        last = dt.date(int(yy), int(mm), {"上旬": 5, "中旬": 15, "下旬": 25}.get(dd) or int(dd))
+        season = today.year if today.month >= 7 else today.year - 1  # 今シーズンが始まった年
+        y = season + (1 if last.month < 7 else 0)
+        return dt.date(y, last.month, min(last.day, 28) if last.month == 2 else last.day), True
+    return None, False
 
 
 def plan_stats(c, day):
@@ -163,7 +176,7 @@ def main():
         scale = P["scale"][fit_region(r)]
         up, low = per_model(f["upper"], scale), per_model(f["lower"], scale)
         ens = ens_all.get(r["id"]) or {}  # fetch.py が日ごとにまとめた51通り
-        opened_date = dt.date.fromisoformat(r["open"]) if r.get("open") else None
+        opened_date, est = open_date(r, today)
         cells = []
         for d in days:
             lead = (d - today).days
@@ -184,14 +197,14 @@ def main():
             if len(sums) >= 20:
                 lo, hi = sums[int(len(sums) * 0.1)], sums[int(len(sums) * 0.9)]
             bl = blend_day(low, d, max(lead, 1))
-            opened = False if opened_date is None else d >= opened_date
+            opened = None if opened_date is None else d >= opened_date
             lv, label = judge(lead, rain, gust, temp, prob, opened)
             cells.append({"date": d.isoformat(), "new": round(new), "lo": None if lo is None else round(lo),
                           "hi": None if hi is None else round(hi), "prob": round(prob, 2), "src": src,
                           "rain": round(rain, 1), "temp": round(temp, 1), "low_rain": round(bl["rain"], 1) if bl else None,
                           "lv": lv, "label": label, "gust": round(gust) if gust is not None else None, "lead": lead})
         am = (data.get("amedas") or {}).get(r["amedas"] or "", {})
-        rows.append({"r": r, "cells": cells, "amedas": am})
+        rows.append({"r": r, "cells": cells, "amedas": am, "open": opened_date, "est": est})
 
     start = today - dt.timedelta(days=today.weekday()) + dt.timedelta(days=7)
     weeks = [start + dt.timedelta(days=7 * w) for w in range(6)]
@@ -215,12 +228,12 @@ ONEMONTH_FOR = {"北海道": ("北海道",), "東北": ("東北",), "関東甲�
                 "中京": ("東海",), "関西": ("近畿",), "中国・四国・九州": ("中国", "四国", "九州北部")}
 
 
-def weekend_picks(rows, days, n):
+def weekend_picks(rows, days, n, prefix):
     wk = [d.isoformat() for d in days if d.weekday() >= 5][:2]
     picks = []
     for row in rows:
         for c in row["cells"]:
-            if c and c["date"] in wk and c["lv"] in ("powder", "ok") and c["new"] >= 3:
+            if c and c["date"] in wk and c["lv"] in ("powder", "ok") and c["new"] >= 5:
                 picks.append((c["new"] + (30 if c["lv"] == "powder" else 0) - c["rain"] * 5, row, c))
     picks.sort(key=lambda x: -x[0])
     top, seen = [], set()
@@ -230,9 +243,10 @@ def weekend_picks(rows, days, n):
         seen.add(row["r"]["id"])
         d = dt.date.fromisoformat(c["date"])
         conf = "見込み" if c["lead"] <= 3 else "目安"
+        slug = dict(PAGES)[row["r"]["region"]]
         top.append(f'<li><span class="lv lv-{c["lv"]}">{badge(c["lv"])}{esc(c["label"])}</span>'
-                   f'<b>{esc(row["r"]["name"])}</b><span class="sub">{esc(row["r"]["pref"])}・{d.month}/{d.day}({WEEK[d.weekday()]})の朝 '
-                   f'新雪{c["new"]}cm{conf}・20cm以上の確率 {round(c["prob"] * 100)}%</span></li>')
+                   f'<a href="{prefix}r/{slug}.html#{row["r"]["id"]}"><b>{esc(row["r"]["name"])}</b><span class="sub">{esc(row["r"]["pref"])}・{d.month}/{d.day}({WEEK[d.weekday()]})の朝 '
+                   f'新雪{c["new"]}cm{conf}・20cm以上の確率 {round(c["prob"] * 100)}%</span></a></li>')
         if len(top) == n:
             break
     return "".join(top) or '<li class="none">今週末は新雪の見込みがあるゲレンデがありません</li>'
@@ -249,7 +263,7 @@ def accuracy():
     pct = lambda x: f"{round(x * 100)}%" if x is not None else "－"
     return (f'去年までの2冬・全国{P["stations"]}か所のアメダスで確かめた当たり具合（1冬目で係数を決めて2冬目で測り、その逆も平均）：'
             f'20cm以上降った日を拾えた割合は1日前 {pct(v["1"]["pod"])}・3日前 {pct(v["3"]["pod"])}・7日前 {pct(v["7"]["pod"])}、'
-            f'パウダーと出た日のうち外れた割合は1日前 {pct(v["1"]["far"])}・7日前 {pct(v["7"]["far"])}。8日目以降は確かめていない目安です。')
+            f'パウダーと出た日のうち外れた割合は1日前 {pct(v["1"]["far"])}・7日前 {pct(v["7"]["far"])}。8日目以降は51通りの予報のうち20cm以上になった割合で、確かめていない目安です。')
 
 
 def render_index(now, days, rows):
@@ -264,7 +278,7 @@ def render_index(now, days, rows):
                       + (f'・7日以内にパウダーの見込み {pw}か所' if pw else "") + '</span></a></li>')
     body = ('<section><h2>地域を選ぶ</h2><ul class="picks">' + "".join(counts) + "</ul></section>"
             f'<section><p class="note">{esc(accuracy())}</p></section>')
-    return fill(head + body + tail, now, "全国", "", weekend_picks(rows, days, 10), "今週末のおすすめ（全国）")
+    return fill(head + body + tail, now, "全国", "", weekend_picks(rows, days, 10, ""), "今週末のおすすめ（全国）")
 
 
 def fill(s, now, title, prefix, weekend, wtitle):
@@ -278,7 +292,7 @@ def esc(s):
 
 def render(now, days, rows, weeks, plan, onemonth, region, prefix):
     tpl = open("template.html", encoding="utf-8").read().replace("<!--grid-->", "").replace("<!--/grid-->", "")
-    weekend = weekend_picks(rows, days, 5)
+    weekend = weekend_picks(rows, days, 5, "../")
 
     # 2週間の表
     head = "".join(f'<th class="{"we" if d.weekday() >= 5 else ""}">{d.month}/{d.day}<br>{WEEK[d.weekday()]}</th>' for d in days)
@@ -308,15 +322,21 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
         am = row["amedas"]
         now_snow = (f'{r.get("amedas_name") or ""}（{r.get("amedas_alt", "")}m）積雪 {am["snow"]}cm'
                     + (f'・24時間で+{am["snow24h"]}cm' if am.get("snow24h") else "")) if am.get("snow") is not None else ""
-        if r.get("open"):
-            od = dt.date.fromisoformat(r["open"])
-            opening = f'{od.month}/{od.day}〜' if od > now.date() else "営業中"
+        od = row["open"]
+        if od is None:
+            opening = "オープン日不明"
+        elif od > now.date():
+            opening = f'{od.month}/{od.day}ごろ〜（去年から推定）' if row["est"] else f'{od.month}/{od.day}〜'
         else:
-            opening = "オープン日未発表"
+            opening = "営業中" + ("（推定）" if row["est"] else "")
+        drive = f'・東京から車{r["drive_h"]}時間' if r.get("drive_h") else ""
         if ri == 0 or r["area"] != rows[ri - 1]["r"]["area"]:
             body.append(f'<tr class="area"><th class="name">{esc(r["area"])}</th><td colspan="{len(days)}"></td></tr>')
-        body.append(f'<tr><th class="name"><a href="{esc(r["url"])}" target="_blank" rel="noopener">{esc(r["name"])}</a>'
-                    f'<span class="sub">{opening}{"・" + esc(now_snow) if now_snow else ""}</span></th>{"".join(tds)}</tr>')
+        wk = [c["new"] for d, c in zip(days, row["cells"]) if c and d.weekday() >= 5 and c["lv"] in ("powder", "ok")][:2]
+        pw = any(c and c["lv"] == "powder" and c["lead"] <= 7 for c in row["cells"])
+        body.append(f'<tr id="{r["id"]}" data-i="{ri}" data-we="{max(wk, default=-1)}" data-drive="{r.get("drive_h") or 99}" data-pow="{int(pw)}">'
+                    f'<th class="name"><a href="{esc(r["url"])}" target="_blank" rel="noopener">{esc(r["name"])}</a>'
+                    f'<span class="sub">{opening}{drive}{"・" + esc(now_snow) if now_snow else ""}</span></th>{"".join(tds)}</tr>')
 
     # 1か月先
     whead = "".join(f'<th>〜{(w + dt.timedelta(days=6)).month}/{(w + dt.timedelta(days=6)).day}</th>' for w in weeks)
@@ -330,8 +350,7 @@ def render(now, days, rows, weeks, plan, onemonth, region, prefix):
             if not s:
                 tds.append('<td class="na">-</td>')
                 continue
-            dep = f'・積雪 {fmt_cm(s["depth"])}' if s["depth"] is not None else ""
-            tds.append(f'<td><b>{fmt_cm(s["median"])}</b><span class="sub">少 {fmt_cm(s["low"])}{dep}</span></td>')
+            tds.append(f'<td><b>{fmt_cm(s["median"])}</b><span class="sub">少 {fmt_cm(s["low"])}</span></td>')
         pbody.append(f'<tr><th class="name">{esc(r["name"])}</th>{"".join(tds)}</tr>')
     om = []
     for area, v in onemonth.items():

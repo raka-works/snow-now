@@ -22,6 +22,7 @@ h2{font-size:17px;margin:0 0 4px}
 .picks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .picks li{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:baseline}
 .picks li .sub{grid-column:2}
+.picks li a{display:block}
 .picks .none{display:block;color:var(--ink2)}
 .lv{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .lv.lv-powder{background:var(--powder-bg);color:var(--powder)}
@@ -36,7 +37,10 @@ thead th.we,td.we{background:var(--we)}
 th.name{position:sticky;left:0;z-index:1;background:var(--surface);text-align:left;font-size:14px;padding:6px 8px 6px 0;min-width:112px;max-width:130px;border-bottom:1px solid var(--grid);white-space:nowrap}
 tr.area th.name,tr.area td{font-size:11px;font-weight:700;color:var(--muted);padding:10px 0 2px;border-bottom:1px solid var(--axis)}
 th.name a{color:var(--ink);text-decoration:none;font-weight:700}
-th.name .sub{font-size:11px;line-height:1.35}
+th.name .sub{font-size:11px;line-height:1.35;white-space:normal}
+.tools{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;margin:0 0 10px}
+.tools select{font:inherit}
+tr:target th.name{background:var(--powder-bg)}
 td{border-bottom:1px solid var(--grid);text-align:center;vertical-align:bottom}
 td.c{cursor:default;padding:4px 0 2px;outline:none}
 td.c:hover,td.c:focus{background:var(--powder-bg)}
@@ -84,8 +88,9 @@ footer a{color:var(--muted)}
 <!--grid-->
 <section>
 <h2>2週間の新雪（ゲレンデ上部）</h2>
-<p class="lead">数字はその日の朝まで（前日15時〜9時）に積もる新雪の cm。4〜7日目は薄い色（確かめた範囲だが外れやすい）。8日目以降は51通りの予報の中央値で、確かめていない目安。マスを押すと詳しい値が出ます。</p>
+<p class="lead">数字はその日の朝まで（前日9時〜当日9時）に積もる新雪の cm。4〜7日目は薄い色（確かめた範囲だが外れやすい）。8日目以降は51通りの予報の中央値で、確かめていない目安。マスを押すと詳しい値が出ます。</p>
 <div class="legend"><span><b style="color:var(--powder)">❄</b> パウダー</span><span>○ 滑れる</span><span><b style="color:var(--bad)">△</b> 雨・強風</span><span>－ 営業前</span><span><i style="background:var(--bar)"></i>3日先まで</span><span><i style="background:var(--bar-far)"></i>4日目以降</span></div>
+<div class="tools"><label>並べ替え <select id="sort"><option value="i">地域順</option><option value="we">今週末の新雪が多い順</option><option value="drive">東京から近い順</option></select></label><label><input type="checkbox" id="pow"> 7日以内にパウダーの見込みがある所だけ</label></div>
 <div class="card scroll">
 <table class="grid"><thead><tr><th class="name"></th>{{head}}</tr></thead><tbody>{{body}}</tbody></table>
 </div>
@@ -94,7 +99,7 @@ footer a{color:var(--muted)}
 
 <section>
 <h2>1か月先の計画用</h2>
-<p class="lead">過去10シーズンで、その日までに上部に降った雪の合計（11/1から）。太字は真ん中の年、「少」は少ない年（下から2割）、「積雪」はふもとのアメダスの積雪の深さ（真ん中の年）。積もっている深さではなく降った量の合計で、気象庁の過去データとアメダスの実測で補正した目安です。週ごと・ゲレンデどうしの比較に使ってください。</p>
+<p class="lead">過去10シーズンで、その日までに上部に降った雪の合計（11/1から）。太字は真ん中の年、「少」は少ない年（下から2割）。積もっている深さではなく降った量の合計で、気象庁の過去データとアメダスの実測で補正した目安です。週ごと・ゲレンデどうしの比較に使ってください。</p>
 <div class="card scroll">
 <table class="plan"><thead><tr><th class="name"></th>{{whead}}</tr></thead><tbody>{{pbody}}</tbody></table>
 </div>
@@ -117,6 +122,13 @@ document.querySelectorAll('[data-tip]').forEach(el=>{
  el.addEventListener('click',()=>show(el));
  el.addEventListener('mouseleave',()=>tip.style.display='none');el.addEventListener('blur',()=>tip.style.display='none');});
 addEventListener('scroll',()=>tip.style.display='none',true);
+const tb=document.querySelector('table.grid tbody'),sel=document.getElementById('sort'),pow=document.getElementById('pow');
+if(tb&&sel){const rows=[...tb.children];
+ function apply(){const k=sel.value,only=pow.checked;
+  const rs=rows.filter(r=>r.id).sort((a,b)=>k==='we'?b.dataset.we-a.dataset.we:k==='drive'?a.dataset.drive-b.dataset.drive:a.dataset.i-b.dataset.i);
+  tb.replaceChildren(...(k==='i'?rows:rs));
+  rows.forEach(r=>{r.hidden=r.id?(only&&r.dataset.pow!=='1'):(k!=='i'||only)});}
+ sel.addEventListener('change',apply);pow.addEventListener('change',apply);}
 </script>
 </body>
 </html>
