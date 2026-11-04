@@ -1,8 +1,0 @@
-時間切れ・接続エラー、取り直す HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=240)
-時間切れ・接続エラー、取り直す HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=240)
-時間切れ・接続エラー、取り直す HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=240)
-時間切れ・接続エラー、取り直す HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=240)
-時間切れ・接続エラー、取り直す HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=240)
-時間切れ・接続エラー、取り直す HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=240)
-時間切れ・接続エラー、取り直す HTTPSConnectionPool(host='api.open-meteo.com', port=443): Read timed out. (read timeout=240)
-ok 2026-11-04 18:23:33.895878+09:00
